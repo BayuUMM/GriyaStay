@@ -1,0 +1,7 @@
+{
+  "name": "GriyaStay Indonesia",
+  "description": "Platform jual beli rumah dan penyewaan hotel online terbaik di Indonesia dengan pengalaman belanja ala marketplace modern.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

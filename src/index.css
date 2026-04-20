@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  
+  --color-brand-primary: #1e293b; /* Deep Navy Slate */
+  --color-brand-secondary: #f8fafc; /* Soft White Slate */
+  --color-brand-accent: #3b82f6; /* Modern Blue */
+  --color-brand-surface: #ffffff;
+  --color-brand-muted: #64748b; /* Muted Slate */
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-[#f8fafc] text-slate-800 antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight font-black text-slate-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-primary text-white px-6 py-3 rounded-sm font-black uppercase text-[11px] tracking-widest hover:bg-slate-900 transition-all shadow-xl shadow-slate-200 active:scale-95;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-50;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 rounded-full hover:bg-gray-300 transition-colors;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
