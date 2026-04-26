@@ -40,6 +40,32 @@ export default function App() {
   const [isQRReady, setIsQRReady] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<CartItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'griyastay' | 'bank' | 'ewallet' | 'qris'>('griyastay');
+  const bannerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const banner = bannerRef.current;
+    if (!banner) return;
+
+    let interval: NodeJS.Timeout;
+    
+    const startAutoSlide = () => {
+      interval = setInterval(() => {
+        if (banner) {
+          const slideWidth = banner.offsetWidth * 0.9; // Approximate width of one slide (90vw)
+          const maxScroll = banner.scrollWidth - banner.offsetWidth;
+          
+          if (banner.scrollLeft >= maxScroll - 10) {
+            banner.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            banner.scrollTo({ left: banner.scrollLeft + slideWidth + 12, behavior: 'smooth' }); // 12 is gap
+          }
+        }
+      }, 5000);
+    };
+
+    startAutoSlide();
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -277,9 +303,13 @@ export default function App() {
 
       <main className="flex-1 pb-20">
         {/* Banner Section */}
-        <div className="bg-white py-4 md:py-6 mb-4 md:mb-6 border-b border-slate-100">
-          <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-            <div className="md:col-span-2 rounded-sm overflow-hidden h-[200px] sm:h-[250px] md:h-[400px] relative group cursor-pointer shadow-sm bg-slate-200">
+        <div className="bg-white py-4 md:py-6 mb-4 md:mb-6 border-b border-slate-100 overflow-hidden">
+          <div 
+            ref={bannerRef}
+            className="max-w-7xl mx-auto px-4 flex overflow-x-auto pb-4 sm:pb-0 gap-3 md:gap-4 snap-x snap-mandatory sm:grid sm:grid-cols-3 scrollbar-hide"
+          >
+            {/* Main Hero Banner */}
+            <div className="min-w-[90vw] sm:min-w-0 sm:col-span-2 rounded-sm overflow-hidden h-[250px] md:h-[400px] relative group cursor-pointer shadow-sm bg-slate-200 snap-center">
               <img 
                 src="https://images.unsplash.com/photo-1549463512-23c28a994760?auto=format&fit=crop&w=1200&q=80" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -310,8 +340,10 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-col gap-3 md:gap-4">
-              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[150px] md:h-auto md:flex-1 bg-slate-200">
+
+            <div className="contents sm:flex sm:flex-col gap-3 md:gap-4">
+              {/* Side Promotion Banners */}
+              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[250px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[90vw] sm:min-w-0 snap-center">
                 <img 
                   src="https://images.unsplash.com/photo-1596422846543-75c6fc18a593?auto=format&fit=crop&w=800&q=80" 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
@@ -322,12 +354,13 @@ export default function App() {
                     target.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80';
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent flex flex-col justify-end p-4 md:p-6 text-white">
-                  <h3 className="font-black text-sm md:text-xl leading-tight">Staycation di Jakarta</h3>
-                  <p className="text-[10px] md:text-sm text-slate-100/70 font-medium">Penawaran Paket Terbatas</p>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent flex flex-col justify-end p-6 md:p-6 text-white">
+                  <h3 className="font-black text-xl md:text-xl leading-tight">Staycation di Jakarta</h3>
+                  <p className="text-xs md:text-sm text-slate-100/70 font-medium">Penawaran Paket Terbatas</p>
                 </div>
               </div>
-              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[150px] md:h-auto md:flex-1 bg-slate-200">
+
+              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[250px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[90vw] sm:min-w-0 snap-center">
                 <img 
                   src="https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80" 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
@@ -338,9 +371,9 @@ export default function App() {
                     target.src = 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80';
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent flex flex-col justify-end p-4 md:p-6 text-white">
-                  <h3 className="font-black text-sm md:text-xl leading-tight">Bali Beachfront</h3>
-                  <p className="text-[10px] md:text-sm text-slate-100/70 font-medium">Hemat hingga 30%</p>
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent flex flex-col justify-end p-6 md:p-6 text-white">
+                  <h3 className="font-black text-xl md:text-xl leading-tight">Bali Beachfront</h3>
+                  <p className="text-xs md:text-sm text-slate-100/70 font-medium">Hemat hingga 30%</p>
                 </div>
               </div>
             </div>
@@ -482,19 +515,20 @@ export default function App() {
           </div>
 
           {filteredProperties.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            <div className="flex overflow-x-auto pb-6 gap-4 snap-x snap-mandatory sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:gap-6 scrollbar-hide">
               {filteredProperties.map(property => (
-                <PropertyCard 
-                  key={property.id} 
-                  property={property} 
-                  isFavorite={favorites.includes(property.id)}
-                  onFavoriteToggle={(e) => toggleFavorite(property.id, e)}
-                  onClick={handlePropertyClick}
-                  isOwner={user && property.ownerId === user.email}
-                  onDelete={(id, e) => {
-                    handleDeleteProperty(id);
-                  }}
-                />
+                <div key={property.id} className="min-w-[280px] w-[90vw] sm:w-full sm:min-w-0 snap-center">
+                  <PropertyCard 
+                    property={property} 
+                    isFavorite={favorites.includes(property.id)}
+                    onFavoriteToggle={(e) => toggleFavorite(property.id, e)}
+                    onClick={handlePropertyClick}
+                    isOwner={user && property.ownerId === user.email}
+                    onDelete={(id, e) => {
+                      handleDeleteProperty(id);
+                    }}
+                  />
+                </div>
               ))}
             </div>
           ) : (
