@@ -5,10 +5,12 @@ import PropertyCard from './components/PropertyCard';
 import AuthModal from './components/AuthModal';
 import SellPropertyModal from './components/SellPropertyModal';
 import MyListingsModal from './components/MyListingsModal';
+import { VRTourModal } from './components/VRTourModal';
+import { ChatAssistant } from './components/ChatAssistant';
 import { mockProperties } from './data/mockData';
 import { Property, PropertyType, CartItem, FilterTab } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, MapPin, Star, Shield, CreditCard, Truck, MessageCircle, Search, CheckCircle2, Info, Percent, ShoppingCart, Trash2, QrCode, ArrowRight, Filter, Plus } from 'lucide-react';
+import { X, MapPin, Star, Shield, CreditCard, Truck, MessageCircle, Search, CheckCircle2, Info, Percent, ShoppingCart, Trash2, QrCode, ArrowRight, Filter, Plus, ArrowUp } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 import { useUser } from './context/UserContext';
@@ -27,6 +29,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [vrProperty, setVrProperty] = useState<Property | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [sortBy, setSortBy] = useState<'related' | 'newest' | 'bestseller' | 'price-low' | 'price-high'>('related');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -40,6 +43,7 @@ export default function App() {
   const [isQRReady, setIsQRReady] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<CartItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'griyastay' | 'bank' | 'ewallet' | 'qris'>('griyastay');
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const bannerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -82,6 +86,18 @@ export default function App() {
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const locations = useMemo(() => {
     const locs = properties.map(p => {
@@ -132,6 +148,12 @@ export default function App() {
       addToast('Silakan login terlebih dahulu untuk memesan', 'info');
       return;
     }
+
+    if (!user.isKtpVerified) {
+      openAuth('register'); // This will trigger KTP step if already logged in but not verified
+      addToast('Verifikasi KTP diperlukan untuk transaksi', 'info');
+      return;
+    }
     
     setCart(prev => {
       const existing = prev.find(item => item.id === property.id);
@@ -163,6 +185,13 @@ export default function App() {
       addToast('Silakan login terlebih dahulu untuk checkout', 'info');
       return;
     }
+
+    if (!user.isKtpVerified) {
+      openAuth('register');
+      addToast('Verifikasi KTP diperlukan untuk checkout', 'info');
+      return;
+    }
+
     setCurrentOrder(item);
     setIsCartOpen(false);
     setIsPaymentOpen(true);
@@ -306,12 +335,12 @@ export default function App() {
         <div className="bg-white py-4 md:py-6 mb-4 md:mb-6 border-b border-slate-100 overflow-hidden">
           <div 
             ref={bannerRef}
-            className="max-w-7xl mx-auto px-4 flex overflow-x-auto pb-4 sm:pb-0 gap-3 md:gap-4 snap-x snap-mandatory sm:grid sm:grid-cols-3 scrollbar-hide"
+            className="max-w-7xl mx-auto px-4 flex overflow-x-auto pb-6 sm:pb-0 gap-4 sm:grid sm:grid-cols-3 scrollbar-hide snap-x snap-mandatory"
           >
             {/* Main Hero Banner */}
-            <div className="min-w-[90vw] sm:min-w-0 sm:col-span-2 rounded-sm overflow-hidden h-[250px] md:h-[400px] relative group cursor-pointer shadow-sm bg-slate-200 snap-center">
+            <div className="min-w-[85vw] sm:min-w-0 sm:col-span-2 rounded-sm overflow-hidden h-[300px] sm:h-[380px] md:h-[420px] lg:h-[450px] relative group cursor-pointer shadow-sm bg-slate-200 snap-center">
               <img 
-                src="https://images.unsplash.com/photo-1549463512-23c28a994760?auto=format&fit=crop&w=1200&q=80" 
+                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 alt="Banner 1"
                 referrerPolicy="no-referrer"
@@ -320,32 +349,47 @@ export default function App() {
                   target.src = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80';
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent flex flex-col justify-end p-6 md:p-12 text-white">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="bg-yellow-400 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-sm">EXCLUSIVE</span>
-                  <span className="text-[10px] font-bold tracking-widest text-slate-100/70 uppercase">Indonesia</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl md:text-5xl font-black mb-2 md:mb-4 font-display leading-none tracking-tight">Eksplorasi Hunian<br/>Impian Anda.</h2>
-                <p className="text-sm md:text-lg text-slate-100/80 mb-4 md:mb-8 max-w-xs md:max-w-md font-medium">Temukan properti eksklusif dan hotel terbaik di seluruh penjuru Indonesia.</p>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => addToast('Voucher diskon berhasil diklaim!')}
-                    className="bg-white text-slate-900 px-6 md:px-10 py-2.5 md:py-4 rounded-sm font-black w-fit hover:bg-slate-50 transition-all shadow-2xl text-xs md:text-sm uppercase tracking-widest"
-                  >
-                    Mulai Eksplorasi
-                  </button>
-                  <button className="bg-white/10 backdrop-blur-md text-white border border-white/20 px-6 md:px-10 py-2.5 md:py-4 rounded-sm font-bold w-fit hover:bg-white/20 transition-all text-xs md:text-sm uppercase tracking-widest">
-                    Lihat Promo
-                  </button>
-                </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/60 to-slate-900/20 flex flex-col justify-end p-5 sm:p-8 md:p-10 lg:p-12 text-white">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8 }}
+                  className="max-w-2xl"
+                >
+                  <div className="mb-3 sm:mb-4 flex items-center gap-2">
+                    <span className="bg-white/10 backdrop-blur-md border border-white/20 text-white text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-sm tracking-[0.2em] uppercase">Limited Offer</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.3em] text-white/80 uppercase">Indonesia Premiere</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-black mb-3 sm:mb-6 font-display leading-tight sm:leading-[1.15] lg:leading-[1.1] tracking-tighter drop-shadow-2xl">
+                    <span className="sm:hidden text-white">Hunian Impian Anda</span>
+                    <span className="hidden sm:inline text-white">
+                      Eksplorasi Hunian<br className="hidden md:block" />
+                      <span className="sm:italic text-white"> Impian Anda.</span>
+                    </span>
+                  </h2>
+                  <p className="text-[10px] sm:text-sm md:text-base lg:text-lg text-white mb-5 sm:mb-10 max-w-[200px] sm:max-w-sm font-medium leading-relaxed drop-shadow-md line-clamp-2 sm:line-clamp-none">
+                    Temukan properti & hotel eksklusif terbaik di Indonesia.
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <button 
+                      onClick={() => addToast('Voucher diskon berhasil diklaim!')}
+                      className="bg-white text-slate-950 px-6 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-4 rounded-full font-black w-fit hover:bg-slate-100 transition-all shadow-xl text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.2em] active:scale-95"
+                    >
+                      Mulai Eksplorasi
+                    </button>
+                    <button className="bg-white/5 backdrop-blur-xl text-white border border-white/10 px-6 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-4 rounded-full font-bold w-fit hover:bg-white/10 transition-all text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.2em] active:scale-95">
+                      Lihat Promo
+                    </button>
+                  </div>
+                </motion.div>
               </div>
             </div>
 
-            <div className="contents sm:flex sm:flex-col gap-3 md:gap-4">
+            <div className="flex sm:flex-col gap-4 snap-x snap-mandatory min-w-[170vw] sm:min-w-0">
               {/* Side Promotion Banners */}
-              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[250px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[90vw] sm:min-w-0 snap-center">
+              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[300px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[85vw] sm:min-w-0 snap-center">
                 <img 
-                  src="https://images.unsplash.com/photo-1596422846543-75c6fc18a593?auto=format&fit=crop&w=800&q=80" 
+                  src="https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80" 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                   alt="Banner 2"
                   referrerPolicy="no-referrer"
@@ -354,15 +398,15 @@ export default function App() {
                     target.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80';
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent flex flex-col justify-end p-6 md:p-6 text-white">
-                  <h3 className="font-black text-xl md:text-xl leading-tight">Staycation di Jakarta</h3>
-                  <p className="text-xs md:text-sm text-slate-100/70 font-medium">Penawaran Paket Terbatas</p>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex flex-col justify-end p-6 md:p-8 text-white group-hover:from-black transition-all">
+                  <h3 className="font-black text-xl md:text-2xl leading-tight drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)] tracking-tight text-white">Staycation di Jakarta</h3>
+                  <p className="text-[10px] md:text-xs text-white font-bold uppercase tracking-[0.2em] mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Eksklusif GriyaStay</p>
                 </div>
               </div>
 
-              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[250px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[90vw] sm:min-w-0 snap-center">
+              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[300px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[85vw] sm:min-w-0 snap-center">
                 <img 
-                  src="https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80" 
+                  src="https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&w=800&q=80" 
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                   alt="Banner 3"
                   referrerPolicy="no-referrer"
@@ -371,9 +415,9 @@ export default function App() {
                     target.src = 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80';
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent flex flex-col justify-end p-6 md:p-6 text-white">
-                  <h3 className="font-black text-xl md:text-xl leading-tight">Bali Beachfront</h3>
-                  <p className="text-xs md:text-sm text-slate-100/70 font-medium">Hemat hingga 30%</p>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex flex-col justify-end p-6 md:p-8 text-white group-hover:from-black transition-all">
+                  <h3 className="font-black text-xl md:text-2xl leading-tight drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)] tracking-tight text-white">Bali Beachfront</h3>
+                  <p className="text-[10px] md:text-xs text-white font-bold uppercase tracking-[0.2em] mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Hemat sampai 30%</p>
                 </div>
               </div>
             </div>
@@ -523,6 +567,8 @@ export default function App() {
                     isFavorite={favorites.includes(property.id)}
                     onFavoriteToggle={(e) => toggleFavorite(property.id, e)}
                     onClick={handlePropertyClick}
+                    onOpenVR={(p) => setVrProperty(p)}
+                    onShare={(p) => addToast(`Link "${p.title}" berhasil disalin!`, 'info')}
                     isOwner={user && property.ownerId === user.email}
                     onDelete={(id, e) => {
                       handleDeleteProperty(id);
@@ -753,6 +799,25 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)} 
         initialMode={authMode} 
       />
+
+      {/* Back to Top Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.5, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5, y: 20 }}
+            onClick={scrollToTop}
+            className="fixed bottom-36 right-6 z-50 w-12 h-12 bg-white text-slate-900 rounded-full shadow-2xl flex items-center justify-center border border-slate-100 hover:bg-slate-50 transition-all hover:-translate-y-1 active:scale-95 group"
+            title="Kembali ke Atas"
+          >
+            <ArrowUp size={20} className="group-hover:-translate-y-0.5 transition-transform" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* AI Chat Assistant */}
+      <ChatAssistant properties={properties} />
 
       {/* Cart Modal */}
       <AnimatePresence>
@@ -1054,6 +1119,12 @@ export default function App() {
         onClose={() => setIsMyListingsOpen(false)}
         listings={myListings}
         onDelete={handleDeleteProperty}
+      />
+
+      <VRTourModal 
+        property={vrProperty}
+        isOpen={!!vrProperty}
+        onClose={() => setVrProperty(null)}
       />
     </div>
   );

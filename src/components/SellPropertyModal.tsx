@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Camera, MapPin, Plus, CheckCircle2 } from 'lucide-react';
+import { X, Camera, MapPin, Plus, CheckCircle2, Compass } from 'lucide-react';
 import { Property } from '../types';
 import { useUser } from '../context/UserContext';
 
@@ -20,6 +20,7 @@ export default function SellPropertyModal({ isOpen, onClose, onAdd }: SellProper
     address: '',
     description: '',
     image: '',
+    vrImage: '',
     features: ''
   });
 
@@ -34,6 +35,7 @@ export default function SellPropertyModal({ isOpen, onClose, onAdd }: SellProper
       location: formData.city,
       description: formData.description,
       image: formData.image || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+      vrImage: formData.vrImage,
       rating: 5.0,
       reviews: 0,
       features: formData.features.split(',').map(f => f.trim()),
@@ -50,6 +52,7 @@ export default function SellPropertyModal({ isOpen, onClose, onAdd }: SellProper
       address: '',
       description: '',
       image: '',
+      vrImage: '',
       features: ''
     });
   };
@@ -189,6 +192,21 @@ export default function SellPropertyModal({ isOpen, onClose, onAdd }: SellProper
                     />
                     <p className="text-[9px] text-slate-400 italic mt-1">Kosongkan untuk menggunakan gambar default yang sudah kami siapkan.</p>
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">URL Gambar 360° VR (Equirectangular)</label>
+                <div className="relative">
+                  <Compass size={16} className="absolute left-3 top-3 text-slate-400" />
+                  <input 
+                    type="url" 
+                    placeholder="https://images.unsplash.com/panorama-image..."
+                    className="w-full p-2.5 pl-10 border border-slate-200 rounded-sm text-sm focus:outline-none focus:border-slate-800 bg-slate-50/50"
+                    value={formData.vrImage}
+                    onChange={e => setFormData({...formData, vrImage: e.target.value})}
+                  />
+                  <p className="text-[9px] text-slate-400 italic mt-1">Gunakan gambar panorama 360° untuk hasil terbaik (Opsional).</p>
                 </div>
               </div>
 

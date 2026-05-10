@@ -1,7 +1,29 @@
-import React, { useState } from 'react';
-import { Search, ShoppingCart, User, Heart, Bell, LogOut, ChevronDown, MapPin, Plus, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, ShoppingCart, User, Heart, Bell, LogOut, ChevronDown, MapPin, Plus, X, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '../context/UserContext';
+
+const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative flex flex-col items-center" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      {children}
+      <AnimatePresence>
+        {show && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 5, scale: 0.95 }}
+            className="absolute top-full mt-2 px-3 py-1.5 bg-white text-slate-900 text-[10px] font-black rounded-sm shadow-[0_10px_30px_rgba(0,0,0,0.3)] z-[100] whitespace-nowrap pointer-events-none uppercase tracking-[0.1em] border border-slate-200"
+          >
+            {text}
+            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white border-t border-l border-slate-200 rotate-45" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 interface NavbarProps {
   onSearch: (query: string) => void;
@@ -45,9 +67,20 @@ export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth,
                 </span>
                 <div className="absolute top-full right-0 mt-1 w-48 bg-slate-950 text-white rounded-sm shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all py-2 z-50 border border-white/10 backdrop-blur-xl">
                   <div className="px-4 py-2 border-b border-white/5 mb-1">
-                    <p className="font-bold text-xs">{user.name}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="font-bold text-xs">{user.name}</p>
+                      {user.isKtpVerified ? <ShieldCheck size={10} className="text-blue-400" /> : <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">UNVERIFIED</span>}
+                    </div>
                     <p className="text-[10px] text-white/40 truncate">{user.email}</p>
                   </div>
+                  {!user.isKtpVerified && (
+                    <button 
+                      onClick={() => onOpenAuth('register')}
+                      className="w-full text-left px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-[11px] flex items-center gap-2 transition-colors text-amber-400"
+                    >
+                      <ShieldCheck size={14} /> Verifikasi KTP
+                    </button>
+                  )}
                   <button className="w-full text-left px-4 py-2 hover:bg-white/5 text-[11px] flex items-center gap-2 transition-colors"><User size={14} className="text-white/30" /> Profil Saya</button>
                   <button 
                     onClick={onShowMyListings}
@@ -120,10 +153,28 @@ export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth,
                         className="absolute top-full right-0 mt-3 w-56 bg-slate-900 text-white rounded-sm shadow-2xl py-3 z-[100] border border-white/10 ring-1 ring-black/50"
                       >
                         <div className="px-4 pb-3 mb-2 border-b border-white/5">
-                          <p className="font-bold text-sm text-white">{user.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-sm text-white">{user.name}</p>
+                            {user.isKtpVerified ? (
+                              <ShieldCheck size={12} className="text-blue-400" />
+                            ) : (
+                              <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">UNVERIFIED</span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-white/40 truncate">{user.email}</p>
                         </div>
                         <div className="flex flex-col">
+                          {!user.isKtpVerified && (
+                             <button 
+                              className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-sm transition-colors text-amber-400"
+                              onClick={() => {
+                                onOpenAuth('register');
+                                setIsMobileMenuOpen(false);
+                              }}
+                            >
+                              <ShieldCheck size={16} /> Verifikasi KTP Sekarang
+                            </button>
+                          )}
                           <button 
                             className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm transition-colors text-white/70 hover:text-white"
                             onClick={() => setIsMobileMenuOpen(false)}
@@ -187,54 +238,110 @@ export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth,
 
           {/* Desktop Icons */}
           <div className="hidden md:flex items-center gap-6">
-            <div className="flex flex-col items-center gap-0.5 cursor-pointer group text-white/60 hover:text-white transition-colors relative">
-              <Heart size={22} />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Favorit</span>
-              {favoriteCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-slate-900">
-                  {favoriteCount}
-                </span>
-              )}
-            </div>
-            <div 
-              onClick={onOpenCart}
-              className="flex flex-col items-center gap-0.5 cursor-pointer group text-white/60 hover:text-white transition-colors relative"
-            >
-              <ShoppingCart size={22} />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Keranjang</span>
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-white text-slate-950 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-slate-900">
-                  {cartCount}
-                </span>
-              )}
-            </div>
+            <Tooltip text="Daftar Favorit Anda">
+              <div className="flex flex-col items-center gap-0.5 cursor-pointer group text-white/60 hover:text-white transition-colors relative">
+                <Heart size={22} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Favorit</span>
+                {favoriteCount > 0 && (
+                  <span className="absolute -top-1 -right-0 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-slate-900">
+                    {favoriteCount}
+                  </span>
+                )}
+              </div>
+            </Tooltip>
+            
+            <Tooltip text="Keranjang Belanja">
+              <div 
+                onClick={onOpenCart}
+                className="flex flex-col items-center gap-0.5 cursor-pointer group text-white/60 hover:text-white transition-colors relative"
+              >
+                <ShoppingCart size={22} />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Keranjang</span>
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-0 bg-white text-slate-950 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-slate-900">
+                    {cartCount}
+                  </span>
+                )}
+              </div>
+            </Tooltip>
+
             <div className="w-px h-8 bg-white/10 mx-1" />
-            <div className="flex items-center gap-3 cursor-pointer group px-1">
-              {user ? (
-                <div className="flex items-center gap-3">
-                  <div className="text-right hidden xl:block">
-                    <p className="text-[10px] text-white/40 font-bold uppercase">Membership Elite</p>
-                    <p className="text-xs font-bold text-white">{user.name}</p>
+            
+            <Tooltip text={user ? "Atur Profil & Akun" : "Masuk ke Akun Anda"}>
+              <div className="relative group/profile px-1">
+                {user ? (
+                  <>
+                    <div className="flex items-center gap-3 cursor-pointer group">
+                      <div className="text-right hidden xl:block">
+                        <p className="text-[10px] text-white/40 font-bold uppercase">Membership Elite</p>
+                        <p className="text-xs font-bold text-white">{user.name}</p>
+                      </div>
+                      <div className="w-10 h-10 bg-white text-slate-950 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ring-1 ring-white/20 border-2 border-slate-900 group-hover:scale-110 transition-transform">
+                        {user.name.charAt(0)}
+                      </div>
+                      <ChevronDown size={14} className="text-white/40 group-hover:text-white transition-colors ml-[-4px]" />
+                    </div>
+                    
+                    {/* Desktop/Tablet Profile Dropdown */}
+                    <div className="absolute top-full right-0 mt-3 w-56 bg-slate-950 text-white rounded-sm shadow-2xl opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all py-3 z-[100] border border-white/10 backdrop-blur-xl">
+                      <div className="px-4 pb-3 mb-2 border-b border-white/5">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-white">{user.name}</p>
+                          {user.isKtpVerified ? (
+                            <ShieldCheck size={12} className="text-blue-400" />
+                          ) : (
+                            <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">UNVERIFIED</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-white/40 truncate">{user.email}</p>
+                      </div>
+                      <div className="flex flex-col">
+                        {!user.isKtpVerified && (
+                          <button 
+                            className="flex items-center gap-3 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-[11px] transition-colors text-amber-400"
+                            onClick={() => onOpenAuth('register')}
+                          >
+                            <ShieldCheck size={14} /> Verifikasi KTP
+                          </button>
+                        )}
+                        <button className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-white/70 hover:text-white">
+                          <User size={14} className="text-white/30" /> Profil Saya
+                        </button>
+                        <button 
+                          onClick={onShowMyListings}
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-white/70 hover:text-white"
+                        >
+                          <Plus size={14} className="text-white/30" /> Iklan Saya
+                        </button>
+                        <button className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-white/70 hover:text-white">
+                          <ShoppingCart size={14} className="text-white/30" /> Pesanan Saya
+                        </button>
+                        <div className="h-px bg-white/5 my-1" />
+                        <button 
+                          onClick={logout}
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-rose-400 hover:text-rose-300"
+                        >
+                          <LogOut size={14} /> Keluar Akun
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div 
+                    onClick={() => onOpenAuth('login')}
+                    className="flex items-center gap-3 group cursor-pointer"
+                  >
+                    <div className="w-10 h-10 bg-white/5 text-white/40 rounded-full flex items-center justify-center transition-colors group-hover:bg-white/10 group-hover:text-white/80 ring-1 ring-white/10">
+                      <User size={22} />
+                    </div>
+                    <div className="text-left hidden lg:block">
+                      <p className="text-[10px] text-white/40 font-bold uppercase">Selamat Datang</p>
+                      <p className="text-xs font-bold text-white transition-colors group-hover:text-blue-300 underline underline-offset-2">Login / Daftar</p>
+                    </div>
                   </div>
-                  <div className="w-10 h-10 bg-white text-slate-950 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ring-1 ring-white/20 border-2 border-slate-900 group-hover:scale-110 transition-transform">
-                    {user.name.charAt(0)}
-                  </div>
-                </div>
-              ) : (
-                <div 
-                  onClick={() => onOpenAuth('login')}
-                  className="flex items-center gap-3 group"
-                >
-                  <div className="w-10 h-10 bg-white/5 text-white/40 rounded-full flex items-center justify-center transition-colors group-hover:bg-white/10 group-hover:text-white/80 ring-1 ring-white/10">
-                    <User size={22} />
-                  </div>
-                  <div className="text-left hidden lg:block">
-                    <p className="text-[10px] text-white/40 font-bold uppercase">Selamat Datang</p>
-                    <p className="text-xs font-bold text-white transition-colors group-hover:text-blue-300 underline underline-offset-2">Login / Daftar</p>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </Tooltip>
           </div>
         </div>
       </div>

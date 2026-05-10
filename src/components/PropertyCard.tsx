@@ -1,13 +1,15 @@
 import React from 'react';
 import { Property } from '../types';
-import { MapPin, Star, Bed, Bath, Square, Heart, Trash2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { MapPin, Star, Bed, Bath, Square, Heart, Trash2, Share2, Link2, Instagram, MessageCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface PropertyCardProps {
   property: Property;
   onClick: (property: Property) => void;
   isFavorite: boolean;
   onFavoriteToggle: (e: React.MouseEvent) => void;
+  onShare?: (property: Property) => void;
+  onOpenVR?: (property: Property) => void;
   isOwner?: boolean;
   onDelete?: (id: string, e: React.MouseEvent) => void;
   key?: string | number;
@@ -18,9 +20,13 @@ export default function PropertyCard({
   onClick, 
   isFavorite, 
   onFavoriteToggle,
+  onShare,
+  onOpenVR,
   isOwner,
   onDelete 
 }: PropertyCardProps) {
+  const [showShareMenu, setShowShareMenu] = React.useState(false);
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -29,8 +35,27 @@ export default function PropertyCard({
     }).format(price);
   };
 
+  const handleShare = (platform: 'link' | 'wa' | 'ig') => {
+    const url = `${window.location.origin}/property/${property.id}`;
+    const text = `Cek properti menarik ini: ${property.title}`;
+
+    if (platform === 'link') {
+      navigator.clipboard.writeText(url);
+      if (onShare) onShare(property);
+    } else if (platform === 'wa') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank');
+    } else if (platform === 'ig') {
+      window.open(`https://instagram.com`, '_blank');
+    }
+    setShowShareMenu(false);
+  };
+
   return (
     <motion.div 
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
       whileHover={{ y: -8 }}
       className="bg-white rounded-sm overflow-hidden cursor-pointer group border border-slate-100/50 hover:shadow-2xl hover:shadow-slate-200 transition-all duration-300"
       onClick={() => onClick(property)}
@@ -63,14 +88,77 @@ export default function PropertyCard({
           </div>
         </div>
         
-        <button 
-          onClick={onFavoriteToggle}
-          className={`absolute top-3 right-3 p-2 rounded-full transition-all shadow-md backdrop-blur-md ${
-            isFavorite ? 'bg-rose-500 text-white' : 'bg-white/80 text-slate-400 hover:bg-white hover:text-slate-900'
-          }`}
-        >
-          <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
-        </button>
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenVR) onOpenVR(property);
+            }}
+            className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-white/20 hover:bg-slate-950 transition-all shadow-xl"
+          >
+            <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+            360° VR
+          </button>
+        </div>
+
+        <div className="absolute top-3 right-3 flex flex-col gap-2">
+          <button 
+            onClick={onFavoriteToggle}
+            className={`p-2 rounded-full transition-all shadow-md backdrop-blur-md ${
+              isFavorite ? 'bg-rose-500 text-white' : 'bg-white/80 text-slate-400 hover:bg-white hover:text-slate-900'
+            }`}
+          >
+            <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
+          </button>
+
+          <div className="relative">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowShareMenu(!showShareMenu);
+              }}
+              className={`p-2 rounded-full transition-all shadow-md backdrop-blur-md ${
+                showShareMenu ? 'bg-slate-900 text-white' : 'bg-white/80 text-slate-400 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              <Share2 size={14} />
+            </button>
+
+            <AnimatePresence>
+              {showShareMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, x: 10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                  className="absolute top-0 right-12 bg-white rounded-sm shadow-2xl border border-slate-100 p-2 flex gap-2 z-50 backdrop-blur-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button 
+                    onClick={() => handleShare('wa')}
+                    className="p-2 hover:bg-green-50 text-green-600 rounded-sm transition-colors"
+                    title="WhatsApp"
+                  >
+                    <MessageCircle size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleShare('ig')}
+                    className="p-2 hover:bg-rose-50 text-rose-600 rounded-sm transition-colors"
+                    title="Instagram"
+                  >
+                    <Instagram size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleShare('link')}
+                    className="p-2 hover:bg-blue-50 text-blue-600 rounded-sm transition-colors"
+                    title="Copy Link"
+                  >
+                    <Link2 size={16} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
 
         {isOwner && onDelete && (
           <button 
@@ -78,7 +166,7 @@ export default function PropertyCard({
               e.stopPropagation();
               onDelete(property.id, e);
             }}
-            className="absolute top-3 right-14 p-2 bg-white/80 text-slate-400 hover:bg-red-500 hover:text-white rounded-full transition-all shadow-md backdrop-blur-md"
+            className="absolute top-1/2 -translate-y-1/2 right-3 p-2 bg-white/80 text-slate-400 hover:bg-red-500 hover:text-white rounded-full transition-all shadow-md backdrop-blur-md"
             title="Hapus Iklan"
           >
             <Trash2 size={14} />

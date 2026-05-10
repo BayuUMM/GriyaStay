@@ -4,6 +4,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  isKtpVerified: boolean;
 }
 
 interface UserContextType {
@@ -11,6 +12,7 @@ interface UserContextType {
   login: (email: string, name: string) => void;
   register: (email: string, name: string) => void;
   logout: () => void;
+  verifyKtp: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -22,15 +24,23 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
 
   const login = (email: string, name: string) => {
-    const newUser = { id: Math.random().toString(36).substr(2, 9), email, name };
+    const newUser = { id: Math.random().toString(36).substr(2, 9), email, name, isKtpVerified: false };
     setUser(newUser);
     localStorage.setItem('griyastay_user', JSON.stringify(newUser));
   };
 
   const register = (email: string, name: string) => {
-    const newUser = { id: Math.random().toString(36).substr(2, 9), email, name };
+    const newUser = { id: Math.random().toString(36).substr(2, 9), email, name, isKtpVerified: false };
     setUser(newUser);
     localStorage.setItem('griyastay_user', JSON.stringify(newUser));
+  };
+
+  const verifyKtp = () => {
+    if (user) {
+      const updatedUser = { ...user, isKtpVerified: true };
+      setUser(updatedUser);
+      localStorage.setItem('griyastay_user', JSON.stringify(updatedUser));
+    }
   };
 
   const logout = () => {
@@ -39,7 +49,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <UserContext.Provider value={{ user, login, register, logout }}>
+    <UserContext.Provider value={{ user, login, register, logout, verifyKtp }}>
       {children}
     </UserContext.Provider>
   );

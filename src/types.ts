@@ -17,6 +17,7 @@ export interface Property {
   sqft?: number;
   amenities?: string[];
   isPromo?: boolean;
+  vrImage?: string;
   createdAt: string;
   ownerId?: string;
 }
