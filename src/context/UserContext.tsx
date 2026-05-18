@@ -29,94 +29,104 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 SAFE FETCH USER PROFILE
-  const fetchUserProfile = async (authUser: any) => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", authUser.id)
-      .maybeSingle(); // 🔥 penting biar gak crash
-
-    if (error || !data) return null;
-
-    return {
-      id: data.id,
-      name: data.name,
-      email: data.email,
-      isKtpVerified: data.ktp_verified,
-    };
-  };
-
+  // 🔥 INIT SESSION (SAFE MODE ANTI WHITE SCREEN)
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
+    const getSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const sessionUser = data.session?.user;
 
-      const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionUser) {
+          const { data: userData } = await supabase
+            .from("users")
+            .select("*")
+            .eq("id", sessionUser.id)
+            .single();
 
-      const sessionUser = sessionData?.session?.user;
-
-      if (sessionUser) {
-        const profile = await fetchUserProfile(sessionUser);
-        if (profile) setUser(profile);
-      }
-
-      setLoading(false);
-    };
-
-    init();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        const authUser = session?.user;
-
-        if (authUser) {
-          const profile = await fetchUserProfile(authUser);
-          setUser(profile);
+          if (userData) {
+            setUser({
+              id: userData.id,
+              name: userData.name,
+              email: userData.email,
+              isKtpVerified: userData.ktp_verified,
+            });
+          }
         } else {
           setUser(null);
         }
-
+      } catch (err) {
+        console.error("Session error:", err);
+        setUser(null);
+      } finally {
         setLoading(false);
+      }
+    };
+
+    getSession();
+
+    // 🔥 LISTENER LOGIN / LOGOUT
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_, session) => {
+        try {
+          if (session?.user) {
+            const { data } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", session.user.id)
+              .single();
+
+            setUser(
+              data
+                ? {
+                    id: data.id,
+                    name: data.name,
+                    email: data.email,
+                    isKtpVerified: data.ktp_verified,
+                  }
+                : null,
+            );
+          } else {
+            setUser(null);
+          }
+        } catch (err) {
+          console.error("Auth change error:", err);
+          setUser(null);
+        }
       },
     );
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  // LOGIN
+  // 🔥 LOGIN FIXED
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+      alert(error.message);
+      return;
+    }
   };
 
-  // REGISTER
   const register = async (email: string, password: string, name: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: { name },
+      },
     });
 
-    if (error) throw error;
-
-    setTimeout(async () => {
-      const { data: authData } = await supabase.auth.getUser();
-
-      if (authData?.user) {
-        await supabase.from("users").upsert({
-          id: authData.user.id,
-          email,
-          name,
-          ktp_verified: false,
-        });
-      }
-    }, 500);
+    if (error) {
+      alert(error.message);
+    }
   };
 
-  // VERIFY KTP
   const verifyKtp = async () => {
     if (!user) return;
 
@@ -128,7 +138,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setUser({ ...user, isKtpVerified: true });
   };
 
-  // LOGOUT
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -136,7 +145,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <UserContext.Provider
-      value={{ user, loading, login, register, verifyKtp, logout }}
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        verifyKtp,
+        logout,
+      }}
     >
       {children}
     </UserContext.Provider>

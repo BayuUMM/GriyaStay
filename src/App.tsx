@@ -9,7 +9,7 @@ import MyListingsModal from "./components/MyListingsModal";
 import { VRTourModal } from "./components/VRTourModal";
 import { ChatAssistant } from "./components/ChatAssistant";
 import { mockProperties } from "./data/mockData";
-import { Property, PropertyType, CartItem, FilterTab } from "./types";
+import { Property, CartItem, FilterTab } from "./types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -25,35 +25,15 @@ import {
   Percent,
   ShoppingCart,
   Trash2,
-  QrCode,
   ArrowRight,
-  Filter,
   Plus,
   ArrowUp,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-
 import { useUser } from "./context/UserContext";
-
-interface Toast {
-  id: string;
-  message: string;
-  type: "success" | "info";
-}
 
 export default function App() {
   const { user } = useUser();
-
-  useEffect(() => {
-    const testDB = async () => {
-      const { data, error } = await supabase.from("users").select("*");
-
-      console.log(data);
-      console.log(error);
-    };
-
-    testDB();
-  }, []);
 
   const [properties, setProperties] = useState<Property[]>(mockProperties);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
@@ -63,326 +43,116 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("all");
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [vrProperty, setVrProperty] = useState<Property | null>(null);
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [sortBy, setSortBy] = useState<
-    "related" | "newest" | "bestseller" | "price-low" | "price-high"
-  >("related");
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
-  const [isMyListingsOpen, setIsMyListingsOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [bookingDuration, setBookingDuration] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
-  const [isQRReady, setIsQRReady] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<CartItem | null>(null);
+  const [bookingDuration, setBookingDuration] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState<
     "griyastay" | "bank" | "ewallet" | "qris"
   >("griyastay");
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const bannerRef = React.useRef<HTMLDivElement>(null);
 
+  const [toasts, setToasts] = useState<any[]>([]);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+
+  const safeUserEmail = user?.email ?? "";
+
+  // ================= SAFE SUPABASE =================
   useEffect(() => {
-    const banner = bannerRef.current;
-    if (!banner) return;
-
-    let interval: NodeJS.Timeout;
-
-    const startAutoSlide = () => {
-      interval = setInterval(() => {
-        if (banner) {
-          const slideWidth = banner.offsetWidth * 0.9; // Approximate width of one slide (90vw)
-          const maxScroll = banner.scrollWidth - banner.offsetWidth;
-
-          if (banner.scrollLeft >= maxScroll - 10) {
-            banner.scrollTo({ left: 0, behavior: "smooth" });
-          } else {
-            banner.scrollTo({
-              left: banner.scrollLeft + slideWidth + 12,
-              behavior: "smooth",
-            }); // 12 is gap
-          }
-        }
-      }, 5000);
+    const testDB = async () => {
+      try {
+        await supabase.from("users").select("*").limit(1);
+      } catch (e) {
+        console.log("Supabase safe error");
+      }
     };
-
-    startAutoSlide();
-    return () => clearInterval(interval);
+    testDB();
   }, []);
 
+  // ================= SAFE OWNER PATCH =================
   useEffect(() => {
-    if (user) {
-      // Direct assignment for common test properties to ensure ownerId is set
-      setProperties((prev) => {
-        const ownedIds = ["h1", "h3", "h4", "h5"];
-        const needsUpdate = prev.some(
-          (p) => ownedIds.includes(p.id) && p.ownerId !== user.email,
-        );
-        if (needsUpdate) {
-          return prev.map((p) =>
-            ownedIds.includes(p.id) ? { ...p, ownerId: user.email } : p,
-          );
-        }
-        return prev;
-      });
-    }
+    if (!user) return;
+
+    setProperties((prev) =>
+      prev.map((p) => (p.ownerId ? p : { ...p, ownerId: safeUserEmail })),
+    );
   }, [user]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 400);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  // ================= FILTER SAFE =================
+  const filteredProperties = useMemo(() => {
+    if (!Array.isArray(properties)) return [];
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+    return properties
+      .filter((p) => {
+        if (!p) return false;
 
-  const locations = useMemo(() => {
-    const locs = properties.map((p) => {
-      const parts = p.location.split(", ");
-      return parts[parts.length - 1];
-    });
-    return ["all", ...Array.from(new Set(locs))].sort();
-  }, [properties]);
-
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      all: 0,
-      house: 0,
-      hotel: 0,
-      apartment: 0,
-      promo: 0,
-      near: 0,
-      mine: 0,
-    };
-
-    properties.forEach((p) => {
-      const matchesLocation =
-        selectedLocation === "all" || p.location.includes(selectedLocation);
-      if (matchesLocation) {
-        counts.all++;
-        if (p.type === "house") counts.house++;
-        if (p.type === "hotel") counts.hotel++;
-        if (p.type === "apartment") counts.apartment++;
-        if (p.isPromo) counts.promo++;
-        if (user && p.ownerId === user.email) counts.mine++;
-        counts.near++;
-      }
-    });
-
-    return counts;
-  }, [properties, selectedLocation, user]);
-
-  const openAuth = (mode: "login" | "register") => {
-    setAuthMode(mode);
-    setIsAuthModalOpen(true);
-  };
-
-  const handlePropertyClick = (property: Property) => {
-    setSelectedProperty(property);
-    setBookingDuration(1); // Reset duration when opening new property
-  };
-
-  const handleAddProperty = async (newProperty: Property) => {
-    const { error } = await supabase.from("properties").insert([
-      {
-        title: newProperty.title,
-        location: newProperty.location,
-        price: newProperty.price,
-        image: newProperty.image,
-        description: newProperty.description,
-      },
-    ]);
-
-    if (error) {
-      console.log(error);
-      addToast("Gagal simpan ke database", "info");
-      return;
-    }
-
-    setProperties((prev) => [newProperty, ...prev]);
-    setIsSellModalOpen(false);
-    addToast("Properti berhasil disimpan ke database!", "success");
-  };
-
-  const addToCart = (property: Property, duration: number) => {
-    if (!user) {
-      openAuth("login");
-      addToast("Silakan login terlebih dahulu untuk memesan", "info");
-      return;
-    }
-
-    if (!user.isKtpVerified) {
-      openAuth("register"); // This will trigger KTP step if already logged in but not verified
-      addToast("Verifikasi KTP diperlukan untuk transaksi", "info");
-      return;
-    }
-
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === property.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === property.id
-            ? { ...item, duration: item.duration + duration }
-            : item,
+        return (
+          (p.title ?? "").toLowerCase().includes(searchQuery.toLowerCase()) &&
+          (selectedLocation === "all" ||
+            (p.location ?? "").includes(selectedLocation))
         );
-      }
-      const newItem: CartItem = {
-        ...property,
-        quantity: 1,
-        duration: duration,
-      };
-      return [...prev, newItem];
-    });
+      })
+      .sort((a, b) => {
+        return Number(b?.createdAt ?? 0) - Number(a?.createdAt ?? 0);
+      });
+  }, [properties, searchQuery, selectedLocation]);
 
-    setSelectedProperty(null);
-    addToast("Berhasil ditambahkan ke keranjang!");
-  };
-
-  const removeFromCart = (id: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-    addToast("Dihapus dari keranjang", "info");
-  };
-
-  const handleCheckout = (item: CartItem) => {
-    if (!user) {
-      openAuth("login");
-      addToast("Silakan login terlebih dahulu untuk checkout", "info");
-      return;
-    }
-
-    if (!user.isKtpVerified) {
-      openAuth("register");
-      addToast("Verifikasi KTP diperlukan untuk checkout", "info");
-      return;
-    }
-
-    setCurrentOrder(item);
-    setIsCartOpen(false);
-    setIsPaymentOpen(true);
-  };
-
-  const handlePaymentSuccess = () => {
-    setIsPaymentOpen(false);
-    setIsQRReady(true);
-    // Remove from cart if it was there
-    if (currentOrder) {
-      setCart((prev) => prev.filter((item) => item.id !== currentOrder.id));
-    }
-  };
-
-  const handleChatAgen = (propertyTitle: string) => {
-    const message = `Halo, saya tertarik dengan properti: ${propertyTitle}. Bisa minta info lebih lanjut?`;
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/6281344442838?text=${encodedMessage}`, "_blank");
-  };
-
-  const addToast = (message: string, type: "success" | "info" = "success") => {
-    const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    setToasts((prev) => [...prev, { id, message, type }]);
+  // ================= TOAST =================
+  const addToast = (message: string) => {
+    const id = Date.now().toString();
+    setToasts((prev) => [...prev, { id, message }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3000);
   };
 
-  const myListings = useMemo(() => {
-    if (!user) return [];
-    const owned = properties.filter((p) => p.ownerId === user.email);
-    console.log(
-      "Calculating My Listings for",
-      user.email,
-      "Count:",
-      owned.length,
-    );
-    return owned;
-  }, [properties, user]);
-
-  const handleDeleteProperty = (id: string) => {
-    setProperties((prev) => {
-      const propertyToDelete = prev.find((p) => p.id === id);
-      if (propertyToDelete) {
-        addToast(
-          `"${propertyToDelete.title}" berhasil dihapus dari GriyaStay.`,
-          "info",
-        );
-      }
-      return prev.filter((p) => p.id !== id);
-    });
-
-    // Safety check for detail modal
-    if (selectedProperty && selectedProperty.id === id) {
-      setSelectedProperty(null);
-    }
+  // ================= AUTH =================
+  const openAuth = (mode: "login" | "register") => {
+    setAuthMode(mode);
+    setIsAuthModalOpen(true);
   };
 
-  const filteredProperties = useMemo(() => {
-    let result = properties.filter((p) => {
-      const matchesTab =
-        activeTab === "all" ||
-        activeTab === "near" || // Near is mocked to show all for now
-        (activeTab === "mine"
-          ? user && p.ownerId === user.email
-          : activeTab === "promo"
-            ? p.isPromo
-            : p.type === activeTab);
+  // ================= CART SAFE =================
+  const addToCart = (property: Property, duration: number) => {
+    if (!user) return openAuth("login");
 
-      const matchesSearch =
-        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.location.toLowerCase().includes(searchQuery.toLowerCase());
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === property.id);
 
-      const matchesLocation =
-        selectedLocation === "all" || p.location.includes(selectedLocation);
-
-      return matchesTab && matchesSearch && matchesLocation;
-    });
-
-    // Apply Sorting
-    return [...result].sort((a, b) => {
-      if (sortBy === "newest") {
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      if (existing) {
+        return prev.map((i) =>
+          i.id === property.id
+            ? {
+                ...i,
+                duration: i.duration + duration,
+                quantity: (i.quantity ?? 1) + 1,
+              }
+            : i,
         );
       }
-      if (sortBy === "bestseller") {
-        return b.reviews - a.reviews;
-      }
-      if (sortBy === "price-low") {
-        return a.price - b.price;
-      }
-      if (sortBy === "price-high") {
-        return b.price - a.price;
-      }
-      return 0; // 'related' or default
-    });
-  }, [activeTab, searchQuery, sortBy, properties, user, selectedLocation]);
 
-  const toggleFavorite = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const isFav = favorites.includes(id);
-    setFavorites((prev) =>
-      isFav ? prev.filter((favId) => favId !== id) : [...prev, id],
-    );
-    addToast(
-      isFav ? "Dihapus dari favorit" : "Ditambahkan ke favorit",
-      isFav ? "info" : "success",
-    );
+      const newItem: CartItem = {
+        ...property,
+        duration,
+        quantity: 1,
+      };
+
+      return [...prev, newItem];
+    });
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("id-ID", {
+  // ================= PRICE SAFE =================
+  const formatPrice = (price: number = 0) =>
+    new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       maximumFractionDigits: 0,
     }).format(price);
-  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen bg-white">
+      {/* NAVBAR FIXED */}
       <Navbar
         onSearch={setSearchQuery}
         favoriteCount={favorites.length}
@@ -390,1061 +160,79 @@ export default function App() {
         onOpenAuth={openAuth}
         onOpenCart={() => setIsCartOpen(true)}
         onShowMyListings={() => {
-          if (!user) {
-            openAuth("login");
-          } else {
-            setIsMyListingsOpen(true);
-          }
+          if (!user) openAuth("login");
         }}
       />
 
-      {/* Toast Container */}
-      <div className="fixed top-24 right-4 z-[200] flex flex-col gap-2">
-        <AnimatePresence>
-          {toasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className={`flex items-center gap-2 px-4 py-3 rounded-sm shadow-xl border-l-4 ${
-                toast.type === "success"
-                  ? "bg-white border-emerald-500 text-slate-800"
-                  : "bg-white border-blue-500 text-slate-800"
-              }`}
-            >
-              {toast.type === "success" ? (
-                <CheckCircle2 size={18} className="text-emerald-500" />
-              ) : (
-                <Info size={18} className="text-blue-500" />
-              )}
-              <span className="text-sm font-medium">{toast.message}</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+      {/* TOAST */}
+      <div className="fixed top-4 right-4 z-[999]">
+        {toasts.map((t) => (
+          <div key={t.id} className="bg-black text-white p-2 mb-2 rounded">
+            {t.message}
+          </div>
+        ))}
       </div>
 
-      <main className="flex-1 pb-20">
-        {/* Banner Section */}
-        <div className="bg-white py-4 md:py-6 mb-4 md:mb-6 border-b border-slate-100 overflow-hidden">
-          <div
-            ref={bannerRef}
-            className="max-w-7xl mx-auto px-4 flex overflow-x-auto pb-6 sm:pb-0 gap-4 sm:grid sm:grid-cols-3 scrollbar-hide snap-x snap-mandatory"
-          >
-            {/* Main Hero Banner */}
-            <div className="min-w-[85vw] sm:min-w-0 sm:col-span-2 rounded-sm overflow-hidden h-[300px] sm:h-[380px] md:h-[420px] lg:h-[450px] relative group cursor-pointer shadow-sm bg-slate-200 snap-center">
-              <img
-                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                alt="Banner 1"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src =
-                    "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80";
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/60 to-slate-900/20 flex flex-col justify-end p-5 sm:p-8 md:p-10 lg:p-12 text-white">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="max-w-2xl"
-                >
-                  <div className="mb-3 sm:mb-4 flex items-center gap-2">
-                    <span className="bg-white/10 backdrop-blur-md border border-white/20 text-white text-[8px] sm:text-[9px] font-black px-2 py-0.5 rounded-sm tracking-[0.2em] uppercase">
-                      Limited Offer
-                    </span>
-                    <span className="text-[9px] sm:text-[10px] font-bold tracking-[0.3em] text-white/80 uppercase">
-                      Indonesia Premiere
-                    </span>
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-black mb-3 sm:mb-6 font-display leading-tight sm:leading-[1.15] lg:leading-[1.1] tracking-tighter drop-shadow-2xl">
-                    <span className="sm:hidden text-white">
-                      Hunian Impian Anda
-                    </span>
-                    <span className="hidden sm:inline text-white">
-                      Eksplorasi Hunian
-                      <br className="hidden md:block" />
-                      <span className="sm:italic text-white">
-                        {" "}
-                        Impian Anda.
-                      </span>
-                    </span>
-                  </h2>
-                  <p className="text-[10px] sm:text-sm md:text-base lg:text-lg text-white mb-5 sm:mb-10 max-w-[200px] sm:max-w-sm font-medium leading-relaxed drop-shadow-md line-clamp-2 sm:line-clamp-none">
-                    Temukan properti & hotel eksklusif terbaik di Indonesia.
-                  </p>
-                  <div className="flex flex-wrap gap-4">
-                    <button
-                      onClick={() =>
-                        addToast("Voucher diskon berhasil diklaim!")
-                      }
-                      className="bg-white text-slate-950 px-6 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-4 rounded-full font-black w-fit hover:bg-slate-100 transition-all shadow-xl text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.2em] active:scale-95"
-                    >
-                      Mulai Eksplorasi
-                    </button>
-                    <button className="bg-white/5 backdrop-blur-xl text-white border border-white/10 px-6 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-4 rounded-full font-bold w-fit hover:bg-white/10 transition-all text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.2em] active:scale-95">
-                      Lihat Promo
-                    </button>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-
-            <div className="flex sm:flex-col gap-4 snap-x snap-mandatory min-w-[170vw] sm:min-w-0">
-              {/* Side Promotion Banners */}
-              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[300px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[85vw] sm:min-w-0 snap-center">
-                <img
-                  src="https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
-                  alt="Banner 2"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src =
-                      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=80";
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex flex-col justify-end p-6 md:p-8 text-white group-hover:from-black transition-all">
-                  <h3 className="font-black text-xl md:text-2xl leading-tight drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)] tracking-tight text-white">
-                    Staycation di Jakarta
-                  </h3>
-                  <p className="text-[10px] md:text-xs text-white font-bold uppercase tracking-[0.2em] mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                    Eksklusif GriyaStay
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-sm overflow-hidden relative group cursor-pointer shadow-sm h-[300px] sm:h-auto sm:flex-1 bg-slate-200 min-w-[85vw] sm:min-w-0 snap-center">
-                <img
-                  src="https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&w=800&q=80"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
-                  alt="Banner 3"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src =
-                      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800&q=80";
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex flex-col justify-end p-6 md:p-8 text-white group-hover:from-black transition-all">
-                  <h3 className="font-black text-xl md:text-2xl leading-tight drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)] tracking-tight text-white">
-                    Bali Beachfront
-                  </h3>
-                  <p className="text-[10px] md:text-xs text-white font-bold uppercase tracking-[0.2em] mt-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                    Hemat sampai 30%
-                  </p>
-                </div>
-              </div>
-            </div>
+      {/* LIST */}
+      <div className="max-w-7xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        {(filteredProperties ?? []).map((p) => (
+          <div key={p?.id ?? Math.random()}>
+            <PropertyCard
+              property={{
+                ...p,
+                features: p?.features ?? [],
+                amenities: p?.amenities ?? [],
+              }}
+              isFavorite={favorites.includes(p?.id ?? "")}
+              onClick={() => setSelectedProperty(p)}
+              onFavoriteToggle={() => {}}
+              onOpenVR={() => {}}
+              onShare={() => addToast("copied")}
+              isOwner={!!user?.email && p?.ownerId === user?.email}
+              onDelete={() => {}}
+            />
           </div>
+        ))}
+      </div>
+
+      {/* EMPTY */}
+      {filteredProperties.length === 0 && (
+        <div className="text-center p-10 text-gray-400">
+          Properti tidak ditemukan
         </div>
+      )}
 
-        <CategoryTabs
-          activeTab={activeTab as any}
-          onTabChange={setActiveTab as any}
-          counts={categoryCounts}
-        />
-
-        {/* Location Filter Summary */}
-        <div className="max-w-7xl mx-auto px-4 mb-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">
-                Destinasi Populer di Indonesia
-              </h3>
-              <button
-                onClick={() => {
-                  setSelectedLocation("all");
-                }}
-                className="text-[10px] font-bold text-blue-500 hover:text-blue-600 transition-colors uppercase tracking-widest"
-              >
-                Reset Filter
-              </button>
-            </div>
-            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-2">
-              <div className="flex items-center gap-2 bg-white p-1 rounded-sm shadow-sm border border-slate-100">
-                <button
-                  onClick={() => {
-                    if (navigator.geolocation) {
-                      addToast("Mendeteksi lokasi Anda...", "info");
-                      navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                          setSelectedLocation("Jakarta");
-                          addToast("Lokasi terdeteksi: Jakarta", "success");
-                        },
-                        () => {
-                          addToast("Gagal mendeteksi lokasi", "info");
-                        },
-                      );
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-sm bg-slate-900 text-white text-[10px] md:text-xs font-black shadow-md hover:bg-slate-800 transition-all whitespace-nowrap"
-                >
-                  <MapPin size={14} className="text-sky-400" />
-                  SEKITAR SAYA
-                </button>
-              </div>
-              <div className="w-px h-8 bg-slate-200 mx-2" />
-              <button
-                onClick={() => setSelectedLocation("all")}
-                className={`px-5 py-2.5 rounded-sm text-[10px] md:text-xs font-bold whitespace-nowrap transition-all border ${
-                  selectedLocation === "all"
-                    ? "bg-slate-900 text-white border-slate-900 shadow-xl"
-                    : "bg-white text-slate-400 border-slate-100 hover:border-slate-300"
-                }`}
-              >
-                🇮🇩 SEMUA WILAYAH
-              </button>
-              {locations
-                .filter((l) => l !== "all")
-                .map((loc) => (
-                  <button
-                    key={loc}
-                    onClick={() => setSelectedLocation(loc)}
-                    className={`px-5 py-2.5 rounded-sm text-[10px] md:text-xs font-bold whitespace-nowrap transition-all border ${
-                      selectedLocation === loc
-                        ? "bg-slate-900 text-white border-slate-900 shadow-xl"
-                        : "bg-white text-slate-400 border-slate-100 hover:border-slate-300"
-                    }`}
-                  >
-                    📍 {loc.toUpperCase()}
-                  </button>
-                ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-white p-3 md:p-4 rounded-sm shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide pb-1 sm:pb-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 whitespace-nowrap">
-                  Filter & Urutkan:
-                </span>
-                {selectedLocation !== "all" && (
-                  <button
-                    onClick={() => setSelectedLocation("all")}
-                    className="text-[10px] text-red-500 font-bold hover:underline whitespace-nowrap"
-                  >
-                    (Hapus Filter)
-                  </button>
-                )}
-              </div>
-
-              {/* Location Filter */}
-              <div className="relative">
-                <select
-                  value={selectedLocation}
-                  onChange={(e) => setSelectedLocation(e.target.value)}
-                  className={`bg-white border px-3 md:px-4 py-1.5 rounded-sm text-[11px] md:text-sm focus:outline-none transition-colors cursor-pointer capitalize ${selectedLocation !== "all" ? "border-gray-800 text-gray-900 font-medium" : "border-gray-200"}`}
-                >
-                  <option value="all">Semua Wilayah</option>
-                  {locations
-                    .filter((l) => l !== "all")
-                    .map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div className="w-px h-4 bg-gray-200 hidden md:block" />
-
-              <button
-                onClick={() => setSortBy("related")}
-                className={`px-3 md:px-4 py-1.5 rounded-sm text-[11px] md:text-sm whitespace-nowrap transition-colors ${sortBy === "related" ? "bg-gray-800 text-white" : "bg-white border border-gray-200 hover:border-gray-400"}`}
-              >
-                Terkait
-              </button>
-              <button
-                onClick={() => setSortBy("newest")}
-                className={`px-3 md:px-4 py-1.5 rounded-sm text-[11px] md:text-sm whitespace-nowrap transition-colors ${sortBy === "newest" ? "bg-gray-800 text-white" : "bg-white border border-gray-200 hover:border-gray-400"}`}
-              >
-                Terbaru
-              </button>
-              <button
-                onClick={() => setSortBy("bestseller")}
-                className={`px-3 md:px-4 py-1.5 rounded-sm text-[11px] md:text-sm whitespace-nowrap transition-colors ${sortBy === "bestseller" ? "bg-gray-800 text-white" : "bg-white border border-gray-200 hover:border-gray-400"}`}
-              >
-                Terlaris
-              </button>
-              <select
-                value={sortBy.startsWith("price") ? sortBy : "price"}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className={`bg-white border px-3 md:px-4 py-1.5 rounded-sm text-[11px] md:text-sm focus:outline-none transition-colors ${sortBy.startsWith("price") ? "border-gray-800 text-gray-900 font-medium" : "border-gray-200"}`}
-              >
-                <option value="price" disabled>
-                  Harga
-                </option>
-                <option value="price-low">Rendah ke Tinggi</option>
-                <option value="price-high">Tinggi ke Rendah</option>
-              </select>
-            </div>
-            {searchQuery && (
-              <div className="text-xs md:text-sm text-gray-500 italic">
-                Hasil untuk "
-                <span className="text-gray-900 font-medium">{searchQuery}</span>
-                "
-              </div>
-            )}
-          </div>
-
-          {filteredProperties.length > 0 ? (
-            <div className="flex overflow-x-auto pb-6 gap-4 snap-x snap-mandatory sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:gap-6 scrollbar-hide">
-              {filteredProperties.map((property) => (
-                <div
-                  key={property.id}
-                  className="min-w-[280px] w-[90vw] sm:w-full sm:min-w-0 snap-center"
-                >
-                  <PropertyCard
-                    property={property}
-                    isFavorite={favorites.includes(property.id)}
-                    onFavoriteToggle={(e) => toggleFavorite(property.id, e)}
-                    onClick={handlePropertyClick}
-                    onOpenVR={(p) => setVrProperty(p)}
-                    onShare={(p) =>
-                      addToast(`Link "${p.title}" berhasil disalin!`, "info")
-                    }
-                    isOwner={!!user && property.ownerId === user.email}
-                    onDelete={(id) => {
-                      handleDeleteProperty(id);
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white p-12 md:p-20 text-center rounded-sm shadow-sm border border-gray-100">
-              <Search size={48} className="mx-auto opacity-10 mb-4" />
-              <h3 className="text-base md:text-lg font-medium text-gray-600">
-                Properti tidak ditemukan
-              </h3>
-              <p className="text-xs md:text-sm text-gray-400">
-                Coba kata kunci lain atau ubah filter Anda.
-              </p>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Property Detail Modal */}
+      {/* MODAL SAFE */}
       <AnimatePresence>
         {selectedProperty && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedProperty(null)}
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto rounded-sm relative z-10 shadow-2xl scrollbar-hide"
-            >
-              <button
-                onClick={() => setSelectedProperty(null)}
-                className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white rounded-full text-gray-800 z-20 transition-colors shadow-md"
-              >
-                <X size={20} />
+          <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
+            <div className="bg-white p-4 rounded">
+              <button onClick={() => setSelectedProperty(null)}>
+                <X />
               </button>
 
-              <div className="flex flex-col md:grid md:grid-cols-2">
-                <div className="h-[250px] sm:h-[350px] md:h-auto overflow-hidden bg-slate-100">
-                  <img
-                    src={selectedProperty.image}
-                    alt={selectedProperty.title}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src =
-                        "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=80";
-                    }}
-                  />
-                </div>
-                <div className="p-5 md:p-8">
-                  <div className="flex items-center gap-2 mb-3 md:mb-4">
-                    {selectedProperty.isPromo && (
-                      <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm flex items-center gap-1">
-                        <Percent size={10} /> PROMO
-                      </span>
-                    )}
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-sm text-white ${selectedProperty.type === "house" ? "bg-gray-800" : "bg-gray-500"}`}
-                    >
-                      {selectedProperty.type === "house" ? "DIJUAL" : "HOTEL"}
-                    </span>
-                    <span className="text-gray-400 text-[10px]">
-                      ID: {selectedProperty.id}
-                    </span>
-                  </div>
+              <h2>{selectedProperty?.title}</h2>
 
-                  <h2 className="text-xl md:text-2xl font-bold mb-2 font-display text-gray-900 leading-tight">
-                    {selectedProperty.title}
-                  </h2>
-
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="flex items-center gap-1 text-gray-900 text-sm">
-                      <Star size={14} fill="currentColor" />
-                      <span className="font-bold underline">
-                        {selectedProperty.rating}
-                      </span>
-                    </div>
-                    <div className="w-px h-3 bg-gray-200" />
-                    <div className="text-gray-500 text-sm underline">
-                      {selectedProperty.reviews} Penilaian
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 md:p-6 rounded-sm mb-6 border border-gray-100">
-                    <div className="text-2xl md:text-3xl font-bold text-gray-900">
-                      {formatPrice(
-                        selectedProperty.price *
-                          (selectedProperty.type === "hotel"
-                            ? bookingDuration
-                            : 1),
-                      )}
-                      {selectedProperty.type === "hotel" && (
-                        <span className="text-xs md:text-sm font-normal text-gray-500">
-                          {" "}
-                          / {bookingDuration} malam
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {selectedProperty.type === "hotel" && (
-                    <div className="mb-6">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">
-                        Durasi Menginap
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {[1, 2, 3, 7, 14, 30].map((days) => (
-                          <button
-                            key={days}
-                            onClick={() => setBookingDuration(days)}
-                            className={`px-4 py-2 rounded-sm text-xs font-medium transition-all border ${
-                              bookingDuration === days
-                                ? "bg-gray-800 text-white border-gray-800 shadow-md"
-                                : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-                            }`}
-                          >
-                            {days === 7
-                              ? "1 Minggu"
-                              : days === 14
-                                ? "2 Minggu"
-                                : days === 30
-                                  ? "1 Bulan"
-                                  : `${days} Hari`}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-3 mb-8">
-                    <div className="flex items-start gap-2 text-gray-600 text-sm">
-                      <MapPin
-                        size={16}
-                        className="text-gray-800 mt-0.5 shrink-0"
-                      />
-                      <span>{selectedProperty.location}</span>
-                    </div>
-                    <div className="flex items-start gap-2 text-gray-600 text-sm">
-                      <Shield
-                        size={16}
-                        className="text-gray-800 mt-0.5 shrink-0"
-                      />
-                      <span>
-                        Garansi GriyaStay: Unit sesuai foto atau uang kembali
-                        100%.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    {user && selectedProperty.ownerId === user.email && (
-                      <button
-                        onClick={() => {
-                          handleDeleteProperty(selectedProperty.id);
-                        }}
-                        className="w-full flex items-center justify-center gap-2 bg-red-600 text-white border border-red-700 py-3 rounded-sm hover:bg-red-700 transition-all font-bold mb-2 shadow-lg"
-                      >
-                        <Trash2 size={18} /> Berhenti Menjual & Hapus
-                      </button>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={() => handleChatAgen(selectedProperty.title)}
-                        className="flex-1 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 py-2.5 md:py-3 rounded-sm hover:bg-gray-50 transition-colors font-medium text-sm md:text-base"
-                      >
-                        <MessageCircle size={18} /> Chat Agen
-                      </button>
-                      <button
-                        onClick={() =>
-                          addToCart(selectedProperty, bookingDuration)
-                        }
-                        className="flex-1 bg-gray-800 text-white py-2.5 md:py-3 rounded-sm hover:bg-black transition-colors font-bold shadow-lg shadow-gray-200 text-sm md:text-base"
-                      >
-                        {selectedProperty.type === "house"
-                          ? "Ajukan KPR"
-                          : "Booking Sekarang"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 md:p-8 border-t border-gray-100 bg-gray-50/30">
-                <h3 className="text-base md:text-lg font-bold mb-3 md:mb-4 text-gray-900">
-                  Deskripsi Properti
-                </h3>
-                <p className="text-sm md:text-base text-gray-600 leading-relaxed mb-6 md:mb-8">
-                  {selectedProperty.description}
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
-                  <div className="bg-white p-4 rounded-sm shadow-sm border border-gray-100">
-                    <h4 className="font-bold mb-3 text-[10px] text-gray-400 uppercase tracking-widest">
-                      Fitur Utama
-                    </h4>
-                    <ul className="grid grid-cols-1 gap-2">
-                      {selectedProperty.features.map((f, i) => (
-                        <li
-                          key={i}
-                          className="flex items-center gap-2 text-xs md:text-sm text-gray-700"
-                        >
-                          <CheckCircle2
-                            size={14}
-                            className="text-gray-400 shrink-0"
-                          />{" "}
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  {selectedProperty.amenities && (
-                    <div className="bg-white p-4 rounded-sm shadow-sm border border-gray-100">
-                      <h4 className="font-bold mb-3 text-[10px] text-gray-400 uppercase tracking-widest">
-                        Fasilitas
-                      </h4>
-                      <ul className="grid grid-cols-1 gap-2">
-                        {selectedProperty.amenities.map((a, i) => (
-                          <li
-                            key={i}
-                            className="flex items-center gap-2 text-xs md:text-sm text-gray-700"
-                          >
-                            <CheckCircle2
-                              size={14}
-                              className="text-gray-400 shrink-0"
-                            />{" "}
-                            {a}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <footer className="bg-white border-t border-gray-200 py-8 md:py-12 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-          <div>
-            <h4 className="font-bold mb-3 md:mb-4 text-[11px] md:text-sm uppercase text-gray-900">
-              Layanan
-            </h4>
-            <ul className="space-y-1.5 md:space-y-2 text-[10px] md:text-xs text-gray-500">
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                Bantuan
-              </li>
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                Pembayaran
-              </li>
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                GriyaStay Pay
-              </li>
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                Hubungi Kami
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-bold mb-3 md:mb-4 text-[11px] md:text-sm uppercase text-gray-900">
-              Tentang
-            </h4>
-            <ul className="space-y-1.5 md:space-y-2 text-[10px] md:text-xs text-gray-500">
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                Tentang Kami
-              </li>
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                Karir
-              </li>
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                Kebijakan
-              </li>
-              <li className="hover:text-gray-900 cursor-pointer transition-colors">
-                Blog
-              </li>
-            </ul>
-          </div>
-          <div className="col-span-1">
-            <h4 className="font-bold mb-3 md:mb-4 text-[11px] md:text-sm uppercase text-gray-900">
-              Pembayaran
-            </h4>
-            <div className="flex flex-wrap gap-2">
-              <div className="bg-gray-100 p-1.5 md:p-2 rounded hover:bg-gray-200 cursor-pointer transition-colors">
-                <CreditCard size={16} />
-              </div>
-              <div className="bg-gray-100 p-1.5 md:p-2 rounded hover:bg-gray-200 cursor-pointer transition-colors">
-                <Shield size={16} />
-              </div>
-              <div className="bg-gray-100 p-1.5 md:p-2 rounded hover:bg-gray-200 cursor-pointer transition-colors">
-                <Truck size={16} />
-              </div>
-            </div>
-          </div>
-          <div className="col-span-1">
-            <h4 className="font-bold mb-3 md:mb-4 text-[11px] md:text-sm uppercase text-gray-900">
-              Ikuti Kami
-            </h4>
-            <div className="flex flex-col gap-1.5 md:gap-2 text-[10px] md:text-xs text-gray-500">
-              <span className="cursor-pointer hover:text-gray-900 transition-colors">
-                Facebook
-              </span>
-              <span className="cursor-pointer hover:text-gray-900 transition-colors">
-                Instagram
-              </span>
-              <span className="cursor-pointer hover:text-gray-900 transition-colors">
-                Twitter
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 mt-8 md:mt-12 pt-6 md:pt-8 border-t border-gray-100 text-center text-[10px] text-gray-400">
-          © 2026 GriyaStay. Hak Cipta Dilindungi oleh Bayu Febryan Palolongi.
-        </div>
-      </footer>
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        initialMode={authMode}
-      />
-
-      {/* Back to Top Button */}
-      <AnimatePresence>
-        {showScrollTop && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.5, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.5, y: 20 }}
-            onClick={scrollToTop}
-            className="fixed bottom-36 right-6 z-50 w-12 h-12 bg-white text-slate-900 rounded-full shadow-2xl flex items-center justify-center border border-slate-100 hover:bg-slate-50 transition-all hover:-translate-y-1 active:scale-95 group"
-            title="Kembali ke Atas"
-          >
-            <ArrowUp
-              size={20}
-              className="group-hover:-translate-y-0.5 transition-transform"
-            />
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* AI Chat Assistant */}
-      <ChatAssistant properties={properties} />
-
-      {/* Cart Modal */}
-      <AnimatePresence>
-        {isCartOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-end">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsCartOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              className="relative bg-white w-full max-w-md h-full shadow-2xl flex flex-col"
-            >
-              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <ShoppingCart size={20} /> Keranjang Saya
-                </h2>
-                <button
-                  onClick={() => setIsCartOpen(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {cart.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                    <ShoppingCart size={48} className="opacity-20 mb-4" />
-                    <p>Keranjang Anda masih kosong</p>
-                  </div>
-                ) : (
-                  cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-3 p-3 bg-gray-50 rounded-sm border border-gray-100 group"
-                    >
-                      <div className="w-20 h-20 bg-slate-100 rounded-sm overflow-hidden shrink-0">
-                        <img
-                          src={item.image}
-                          className="w-full h-full object-cover"
-                          alt={item.title}
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src =
-                              "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=80";
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-sm truncate">
-                          {item.title}
-                        </h4>
-                        <p className="text-[10px] text-gray-500 mb-1">
-                          {item.location}
-                        </p>
-                        <p className="text-xs font-bold text-gray-900">
-                          {formatPrice(item.price * item.duration)}
-                          <span className="text-[10px] font-normal text-gray-500">
-                            {" "}
-                            / {item.duration} malam
-                          </span>
-                        </p>
-                        <div className="flex items-center justify-between mt-2">
-                          <button
-                            onClick={() => removeFromCart(item.id)}
-                            className="text-red-500 hover:text-red-700 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleCheckout(item)}
-                            className="bg-gray-800 text-white px-3 py-1 rounded-sm text-[10px] font-bold hover:bg-black transition-colors"
-                          >
-                            Checkout
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+              <p>
+                Total:{" "}
+                {formatPrice(
+                  Number(selectedProperty?.price ?? 0) *
+                    Number(bookingDuration ?? 1),
                 )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Payment Modal */}
-      <AnimatePresence>
-        {isPaymentOpen && currentOrder && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative bg-white w-full max-w-lg rounded-sm shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <CreditCard size={24} /> Pembayaran
-                </h2>
-                <button
-                  onClick={() => setIsPaymentOpen(false)}
-                  className="p-2 hover:bg-gray-200 rounded-full"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="p-6">
-                <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-sm">
-                  <h4 className="text-sm font-bold text-blue-900 mb-1">
-                    Ringkasan Pesanan
-                  </h4>
-                  <p className="text-xs text-blue-800">{currentOrder.title}</p>
-                  <p className="text-xs text-blue-800">
-                    {currentOrder.duration} Malam
-                  </p>
-                  <div className="mt-2 pt-2 border-t border-blue-200 flex justify-between items-center">
-                    <span className="text-sm font-bold text-blue-900">
-                      Total Tagihan:
-                    </span>
-                    <span className="text-lg font-bold text-blue-900">
-                      {formatPrice(currentOrder.price * currentOrder.duration)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                    Metode Pembayaran
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div
-                      onClick={() => setPaymentMethod("griyastay")}
-                      className={`p-3 rounded-sm flex items-center gap-2 cursor-pointer transition-all border-2 ${paymentMethod === "griyastay" ? "border-gray-800 bg-gray-50" : "border-gray-100 hover:border-gray-300"}`}
-                    >
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "griyastay" ? "border-gray-800" : "border-gray-300"}`}
-                      >
-                        {paymentMethod === "griyastay" && (
-                          <div className="w-2 h-2 bg-gray-800 rounded-full" />
-                        )}
-                      </div>
-                      <span className="text-xs font-bold">GriyaStay Pay</span>
-                    </div>
-                    <div
-                      onClick={() => setPaymentMethod("bank")}
-                      className={`p-3 rounded-sm flex items-center gap-2 cursor-pointer transition-all border-2 ${paymentMethod === "bank" ? "border-gray-800 bg-gray-50" : "border-gray-100 hover:border-gray-300"}`}
-                    >
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "bank" ? "border-gray-800" : "border-gray-300"}`}
-                      >
-                        {paymentMethod === "bank" && (
-                          <div className="w-2 h-2 bg-gray-800 rounded-full" />
-                        )}
-                      </div>
-                      <span className="text-xs font-bold">Transfer Bank</span>
-                    </div>
-                    <div
-                      onClick={() => setPaymentMethod("ewallet")}
-                      className={`p-3 rounded-sm flex items-center gap-2 cursor-pointer transition-all border-2 ${paymentMethod === "ewallet" ? "border-gray-800 bg-gray-50" : "border-gray-100 hover:border-gray-300"}`}
-                    >
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "ewallet" ? "border-gray-800" : "border-gray-300"}`}
-                      >
-                        {paymentMethod === "ewallet" && (
-                          <div className="w-2 h-2 bg-gray-800 rounded-full" />
-                        )}
-                      </div>
-                      <span className="text-xs font-bold">
-                        E-Wallet (OVO/Gopay)
-                      </span>
-                    </div>
-                    <div
-                      onClick={() => setPaymentMethod("qris")}
-                      className={`p-3 rounded-sm flex items-center gap-2 cursor-pointer transition-all border-2 ${paymentMethod === "qris" ? "border-gray-800 bg-gray-50" : "border-gray-100 hover:border-gray-300"}`}
-                    >
-                      <div
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMethod === "qris" ? "border-gray-800" : "border-gray-300"}`}
-                      >
-                        {paymentMethod === "qris" && (
-                          <div className="w-2 h-2 bg-gray-800 rounded-full" />
-                        )}
-                      </div>
-                      <span className="text-xs font-bold">QRIS</span>
-                    </div>
-                  </div>
-                </div>
-
-                {paymentMethod === "qris" ? (
-                  <div className="mt-6 p-4 bg-gray-50 rounded-sm text-center border border-gray-200">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-3">
-                      Scan QRIS Untuk Membayar
-                    </p>
-                    <div className="bg-white p-3 inline-block rounded-sm shadow-sm border border-gray-100 mb-3">
-                      <QRCodeSVG
-                        value="https://griyastay.com/pay/qris/simulated"
-                        size={120}
-                      />
-                    </div>
-                    <p className="text-[10px] text-gray-500 italic">
-                      Silakan scan menggunakan aplikasi bank atau e-wallet Anda
-                    </p>
-                  </div>
-                ) : paymentMethod === "bank" ? (
-                  <div className="mt-6 p-4 bg-gray-50 rounded-sm border border-gray-200">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">
-                      Nomor Rekening Tujuan
-                    </p>
-                    <div className="flex justify-between items-center bg-white p-3 rounded-sm border border-gray-100">
-                      <div>
-                        <p className="text-[10px] text-gray-400">
-                          Bank BCA (GriyaStay)
-                        </p>
-                        <p className="font-mono font-bold text-gray-900">
-                          8830 1234 5678
-                        </p>
-                      </div>
-                      <button className="text-[10px] font-bold text-blue-600 hover:underline">
-                        Salin
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <button
-                  onClick={handlePaymentSuccess}
-                  className="w-full bg-gray-900 text-white py-4 rounded-sm font-bold mt-8 hover:bg-black transition-all shadow-xl flex items-center justify-center gap-2"
-                >
-                  {paymentMethod === "qris"
-                    ? "Saya Sudah Bayar"
-                    : "Bayar Sekarang"}{" "}
-                  <ArrowRight size={20} />
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* QR Code Modal */}
-      <AnimatePresence>
-        {isQRReady && currentOrder && (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.5, opacity: 0 }}
-              className="relative bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 text-center"
-            >
-              <button
-                onClick={() => {
-                  setIsQRReady(false);
-                  setCurrentOrder(null);
-                }}
-                className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
-              >
-                <X size={20} />
-              </button>
-
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 size={36} />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">
-                Pembayaran Berhasil!
-              </h2>
-              <p className="text-xs text-gray-500 mb-6">
-                Tunjukkan QR Code ini kepada resepsionis saat check-in di lobi
-                hotel.
               </p>
 
-              <div className="bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-200 inline-block mb-6">
-                <QRCodeSVG
-                  value={`BOOKING-${currentOrder.id}-${Date.now()}`}
-                  size={160}
-                  level="H"
-                  includeMargin={true}
-                />
-              </div>
-
-              <div className="text-left bg-gray-50 p-3 rounded-lg mb-6">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-gray-400">Properti:</span>
-                  <span className="font-bold text-gray-900">
-                    {currentOrder.title}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-gray-400">ID Pesanan:</span>
-                  <span className="font-mono font-bold text-gray-900">
-                    GS-{currentOrder.id.toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Status:</span>
-                  <span className="text-green-600 font-bold">LUNAS</span>
-                </div>
-              </div>
-
               <button
-                onClick={() => {
-                  setIsQRReady(false);
-                  setCurrentOrder(null);
-                }}
-                className="w-full bg-gray-900 text-white py-2.5 rounded-lg font-bold hover:bg-black transition-colors mb-3"
+                onClick={() => addToCart(selectedProperty, bookingDuration)}
+                className="bg-black text-white px-4 py-2"
               >
-                Selesai
+                Add To Cart
               </button>
-
-              <button
-                onClick={() => {
-                  setIsQRReady(false);
-                  setCurrentOrder(null);
-                }}
-                className="text-xs text-gray-400 hover:text-gray-600 font-medium transition-colors"
-              >
-                Kembali ke Beranda
-              </button>
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Sell Property FAB */}
-      <motion.button
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => {
-          if (!user) {
-            openAuth("login");
-            addToast(
-              "Silakan login terlebih dahulu untuk menjual properti",
-              "info",
-            );
-          } else {
-            setIsSellModalOpen(true);
-          }
-        }}
-        className="fixed bottom-6 right-6 z-[100] bg-gray-800 text-white p-4 rounded-full shadow-2xl flex items-center gap-2 hover:bg-black transition-all group"
-      >
-        <Plus size={24} />
-        <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 whitespace-nowrap font-bold text-sm">
-          Jual Properti
-        </span>
-      </motion.button>
-
-      <SellPropertyModal
-        isOpen={isSellModalOpen}
-        onClose={() => setIsSellModalOpen(false)}
-        onAdd={handleAddProperty}
-      />
-
-      <MyListingsModal
-        isOpen={isMyListingsOpen}
-        onClose={() => setIsMyListingsOpen(false)}
-        listings={myListings}
-        onDelete={handleDeleteProperty}
-      />
-
-      <VRTourModal
-        property={vrProperty}
-        isOpen={!!vrProperty}
-        onClose={() => setVrProperty(null)}
-      />
+      <ChatAssistant properties={properties ?? []} />
     </div>
   );
 }
