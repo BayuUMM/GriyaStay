@@ -29,28 +29,35 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 AUTO RESTORE SESSION
+  // 🔥 SAFE FETCH USER PROFILE
+  const fetchUserProfile = async (authUser: any) => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", authUser.id)
+      .maybeSingle(); // 🔥 penting biar gak crash
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      isKtpVerified: data.ktp_verified,
+    };
+  };
+
   useEffect(() => {
     const init = async () => {
+      setLoading(true);
+
       const { data: sessionData } = await supabase.auth.getSession();
 
-      if (sessionData.session?.user) {
-        const authUser = sessionData.session.user;
+      const sessionUser = sessionData?.session?.user;
 
-        const { data, error } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", authUser.id)
-          .single();
-
-        if (!error && data) {
-          setUser({
-            id: data.id,
-            name: data.name,
-            email: data.email,
-            isKtpVerified: data.ktp_verified,
-          });
-        }
+      if (sessionUser) {
+        const profile = await fetchUserProfile(sessionUser);
+        if (profile) setUser(profile);
       }
 
       setLoading(false);
@@ -58,24 +65,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     init();
 
-    // 🔥 LISTENER LOGIN/LOGOUT REALTIME
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        if (session?.user) {
-          const { data } = await supabase
-            .from("users")
-            .select("*")
-            .eq("id", session.user.id)
-            .single();
+        const authUser = session?.user;
 
-          if (data) {
-            setUser({
-              id: data.id,
-              name: data.name,
-              email: data.email,
-              isKtpVerified: data.ktp_verified,
-            });
-          }
+        if (authUser) {
+          const profile = await fetchUserProfile(authUser);
+          setUser(profile);
         } else {
           setUser(null);
         }
@@ -84,9 +80,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       },
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   // LOGIN
@@ -108,36 +102,30 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) throw error;
 
-    // optional: insert user profile
-    const { data: authData } = await supabase.auth.getUser();
+    setTimeout(async () => {
+      const { data: authData } = await supabase.auth.getUser();
 
-    if (authData?.user) {
-      await supabase.from("users").insert([
-        {
+      if (authData?.user) {
+        await supabase.from("users").upsert({
           id: authData.user.id,
           email,
           name,
           ktp_verified: false,
-        },
-      ]);
-    }
+        });
+      }
+    }, 500);
   };
 
-  // KTP VERIFY (simple update)
+  // VERIFY KTP
   const verifyKtp = async () => {
     if (!user) return;
 
-    const { error } = await supabase
+    await supabase
       .from("users")
       .update({ ktp_verified: true })
       .eq("id", user.id);
 
-    if (!error) {
-      setUser({
-        ...user,
-        isKtpVerified: true,
-      });
-    }
+    setUser({ ...user, isKtpVerified: true });
   };
 
   // LOGOUT
@@ -148,14 +136,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <UserContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        register,
-        verifyKtp,
-        logout,
-      }}
+      value={{ user, loading, login, register, verifyKtp, logout }}
     >
       {children}
     </UserContext.Provider>
