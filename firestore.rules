@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Auth / Identification primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User Profile Validation Rules
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'isKtpVerified']) 
+        && data.keys().size() == 3
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 100
+        && data.isKtpVerified is bool;
+    }
+
+    // Property Validation Rules
+    function isValidProperty(data) {
+      return data.keys().hasAll(['title', 'description', 'price', 'location', 'type', 'image', 'createdAt'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 150
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 2000
+        && data.price is number && data.price >= 0
+        && data.location is string && data.location.size() > 0 && data.location.size() <= 250
+        && data.type is string && (data.type == 'house' || data.type == 'hotel' || data.type == 'apartment')
+        && data.image is string && data.image.size() > 0 && data.image.size() <= 1000
+        && (data.ownerId == null || (data.ownerId is string && data.ownerId == request.auth.uid));
+    }
+
+    // Users collection access
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().email == request.auth.token.email;
+      allow update: if isOwner(userId) && isValidUser(incoming()) && incoming().email == existing().email;
+    }
+
+    // Properties collection access
+    match /properties/{propertyId} {
+      allow read: if true; // Dynamic properties listed can be freely browsed
+      allow get: if isValidId(propertyId);
+      allow create: if isSignedIn() && isEmailVerified() && isValidId(propertyId) && isValidProperty(incoming()) && incoming().createdAt == request.time;
+      allow update: if isSignedIn() && isEmailVerified() && isValidId(propertyId) && existing().ownerId == request.auth.uid && isValidProperty(incoming()) && incoming().ownerId == existing().ownerId && incoming().createdAt == existing().createdAt;
+      allow delete: if isSignedIn() && isEmailVerified() && isValidId(propertyId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}

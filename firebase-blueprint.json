@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "User profile representation in GriyaStay",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Verified email of the user"
+        },
+        "isKtpVerified": {
+          "type": "boolean",
+          "description": "Whether the user's KTP is verified"
+        }
+      },
+      "required": ["name", "email", "isKtpVerified"]
+    },
+    "property": {
+      "title": "Property",
+      "description": "Property listing which can be a house, hotel, or apartment",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "location": { "type": "string" },
+        "type": { "type": "string" },
+        "image": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviews": { "type": "number" },
+        "features": { "type": "array" },
+        "bedrooms": { "type": "number" },
+        "bathrooms": { "type": "number" },
+        "sqft": { "type": "number" },
+        "amenities": { "type": "array" },
+        "isPromo": { "type": "boolean" },
+        "vrImage": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["title", "description", "price", "location", "type", "image", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "user",
+      "description": "Users private data directory"
+    },
+    "properties/{propertyId}": {
+      "schema": "property",
+      "description": "Dynamic property listings available on the platform"
+    }
+  }
+}

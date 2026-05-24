@@ -34,7 +34,8 @@ export const mockProperties: Property[] = [
     bathrooms: 3,
     sqft: 2200,
     vrImage: 'https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=1024&q=50',
-    createdAt: '2026-02-20T00:00:00Z'
+    createdAt: '2026-02-20T00:00:00Z',
+    isPromo: true
   },
   {
     id: 'ht1',
@@ -65,7 +66,8 @@ export const mockProperties: Property[] = [
     features: ['Cliff-side', 'Private Butler', 'Eco-Design'],
     amenities: ['Private Pool', 'Yoga Studio', 'Organic Restaurant'],
     vrImage: 'https://images.unsplash.com/photo-1600585154526-990dcea4db0d?auto=format&fit=crop&w=1024&q=50',
-    createdAt: '2026-03-10T00:00:00Z'
+    createdAt: '2026-03-10T00:00:00Z',
+    isPromo: true
   },
   {
     id: 'h3',
@@ -96,7 +98,8 @@ export const mockProperties: Property[] = [
     reviews: 1890,
     features: ['Jungle View', 'Heated Pool', 'Cultural Tours'],
     amenities: ['Free WiFi', 'Spa', 'Fitness Center'],
-    createdAt: '2026-02-15T00:00:00Z'
+    createdAt: '2026-02-15T00:00:00Z',
+    isPromo: true
   },
   {
     id: 'h4',
@@ -463,7 +466,8 @@ export const mockProperties: Property[] = [
     bedrooms: 3,
     bathrooms: 2,
     sqft: 2000,
-    createdAt: '2026-04-14T00:00:00Z'
+    createdAt: '2026-04-14T00:00:00Z',
+    isPromo: true
   },
   {
     id: 'ht14',
@@ -493,7 +497,8 @@ export const mockProperties: Property[] = [
     bedrooms: 3,
     bathrooms: 2,
     sqft: 156,
-    createdAt: '2026-04-16T00:00:00Z'
+    createdAt: '2026-04-16T00:00:00Z',
+    isPromo: true
   },
   {
     id: 'a5',

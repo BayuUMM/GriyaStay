@@ -98,7 +98,7 @@ export const ChatAssistant = ({ properties }: ChatAssistantProps) => {
             initial={{ opacity: 0, y: 20, scale: 0.95, transformOrigin: 'bottom left' }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-24 left-6 z-50 w-[380px] h-[550px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] flex flex-col border border-slate-100 overflow-hidden"
+            className="fixed bottom-24 left-4 right-4 sm:right-auto sm:left-6 z-50 w-[calc(100vw-32px)] sm:w-[380px] h-[500px] sm:h-[550px] max-h-[calc(100vh-120px)] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] flex flex-col border border-slate-100 overflow-hidden"
           >
             {/* Header */}
             <div className="bg-slate-900 p-4 flex items-center justify-between text-white border-b border-white/5">

@@ -1,41 +1,27 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import {
-  X,
-  Mail,
-  Lock,
-  User,
-  ArrowRight,
-  ShieldCheck,
-  Camera,
-  CreditCard,
-} from "lucide-react";
-import { useUser } from "../context/UserContext";
-import supabase from "../supabase";
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X, Mail, Lock, User, ArrowRight, ShieldCheck, Camera, CreditCard } from 'lucide-react';
+import { useUser } from '../context/UserContext';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialMode?: "login" | "register";
+  initialMode?: 'login' | 'register';
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({
-  isOpen,
-  onClose,
-  initialMode = "login",
-}) => {
-  const [mode, setMode] = useState<"login" | "register" | "ktp">(initialMode);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [ktpNumber, setKtpNumber] = useState("");
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
+  const [mode, setMode] = useState<'login' | 'register' | 'ktp'>(initialMode);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [ktpNumber, setKtpNumber] = useState('');
   const [ktpPhoto, setKtpPhoto] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { login, register, verifyKtp, user } = useUser();
+  const { login, register, loginWithGoogle, verifyKtp, user } = useUser();
 
   useEffect(() => {
     if (isOpen && user && !user.isKtpVerified) {
-      setMode("ktp");
+      setMode('ktp');
     }
   }, [isOpen, user]);
 
@@ -54,43 +40,15 @@ const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // LOGIN
-    if (mode === "login") {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
-
-      alert("Login berhasil!");
-      onClose();
-    }
-
-    // REGISTER
-    else if (mode === "register") {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
-
-      alert("Register berhasil! Silakan login.");
-      setMode("login");
-    }
-
-    // KTP
-    else if (mode === "ktp") {
+    if (mode === 'login') {
+      login(email, 'User'); // Mock name for login
+      setMode('ktp');
+    } else if (mode === 'register') {
+      register(email, name);
+      setMode('ktp');
+    } else if (mode === 'ktp') {
       verifyKtp();
       onClose();
     }
@@ -125,32 +83,25 @@ const AuthModal: React.FC<AuthModalProps> = ({
             </button>
 
             <div className="p-8">
-              {mode !== "ktp" ? (
+              {mode !== 'ktp' ? (
                 <>
                   <div className="text-center mb-8">
                     <h2 className="text-2xl font-bold text-slate-900 font-display mb-2">
-                      {mode === "login"
-                        ? "Selamat Datang Kembali"
-                        : "Buat Akun Baru"}
+                      {mode === 'login' ? 'Selamat Datang Kembali' : 'Buat Akun Baru'}
                     </h2>
                     <p className="text-slate-500 text-sm">
-                      {mode === "login"
-                        ? "Masuk untuk mengelola properti impian Anda"
-                        : "Daftar sekarang dan temukan hunian terbaik"}
+                      {mode === 'login' 
+                        ? 'Masuk untuk mengelola properti impian Anda' 
+                        : 'Daftar sekarang dan temukan hunian terbaik'}
                     </p>
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    {mode === "register" && (
+                    {mode === 'register' && (
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">
-                          Nama Lengkap
-                        </label>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Nama Lengkap</label>
                         <div className="relative">
-                          <User
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={18}
-                          />
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                           <input
                             type="text"
                             required
@@ -164,14 +115,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     )}
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">
-                        Email
-                      </label>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Email</label>
                       <div className="relative">
-                        <Mail
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                          size={18}
-                        />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                           type="email"
                           required
@@ -184,14 +130,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">
-                        Kata Sandi
-                      </label>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Kata Sandi</label>
                       <div className="relative">
-                        <Lock
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                          size={18}
-                        />
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                           type="password"
                           required
@@ -207,26 +148,49 @@ const AuthModal: React.FC<AuthModalProps> = ({
                       type="submit"
                       className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 group mt-6"
                     >
-                      {mode === "login" ? "Masuk" : "Daftar Sekarang"}
-                      <ArrowRight
-                        size={18}
-                        className="group-hover:translate-x-1 transition-transform"
-                      />
+                      {mode === 'login' ? 'Masuk' : 'Daftar Sekarang'}
+                      <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </form>
 
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-100"></div>
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
+                      <span className="bg-white px-3 text-slate-400">Atau</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await loginWithGoogle();
+                        setMode('ktp');
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-700 py-3 rounded-lg font-bold hover:bg-slate-100 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] duration-150"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#EA4335"
+                        d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.102 1.025 5.047 1.926l3.227-3.227C18.232 1.346 15.422.5 12.24.5a11.5 11.5 0 0 0-11.5 11.5 11.5 11.5 0 0 0 11.5 11.5c11.97 0 12.24-10.8 11.97-12.215H12.24z"
+                      />
+                    </svg>
+                    Masuk dengan Google
+                  </button>
+
                   <div className="mt-8 pt-6 border-t border-slate-100 text-center">
                     <p className="text-sm text-slate-500">
-                      {mode === "login"
-                        ? "Belum punya akun?"
-                        : "Sudah punya akun?"}
+                      {mode === 'login' ? 'Belum punya akun?' : 'Sudah punya akun?'}
                       <button
-                        onClick={() =>
-                          setMode(mode === "login" ? "register" : "login")
-                        }
+                        onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
                         className="ml-1 font-bold text-slate-900 hover:underline"
                       >
-                        {mode === "login" ? "Daftar di sini" : "Masuk di sini"}
+                        {mode === 'login' ? 'Daftar di sini' : 'Masuk di sini'}
                       </button>
                     </p>
                   </div>
@@ -238,78 +202,51 @@ const AuthModal: React.FC<AuthModalProps> = ({
                       <ShieldCheck size={32} />
                     </div>
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-900 font-display mb-2">
-                    Verifikasi KTP
-                  </h2>
+                  <h2 className="text-2xl font-bold text-slate-900 font-display mb-2">Verifikasi KTP</h2>
                   <p className="text-slate-500 text-sm mb-8">
-                    Pastikan Anda cukup umur untuk melakukan transaksi properti.
-                    Silakan verifikasi identitas Anda.
+                    Pastikan Anda cukup umur untuk melakukan transaksi properti. Silakan verifikasi identitas Anda.
                   </p>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1 text-left">
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">
-                        Nomor NIK KTP
-                      </label>
+                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Nomor NIK KTP</label>
                       <div className="relative">
-                        <CreditCard
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                          size={18}
-                        />
+                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                           type="text"
                           required
                           value={ktpNumber}
-                          onChange={(e) =>
-                            setKtpNumber(
-                              e.target.value.replace(/\D/g, "").slice(0, 16),
-                            )
-                          }
+                          onChange={(e) => setKtpNumber(e.target.value.replace(/\D/g, '').slice(0, 16))}
                           placeholder="320xxxxxxxxxxxxx"
                           className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm"
                         />
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1 ml-1">
-                        NIK harus 16 digit angka.
-                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1 ml-1">NIK harus 16 digit angka.</p>
                     </div>
 
-                    <div
+                    <div 
                       onClick={handlePhotoClick}
                       className="p-4 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 hover:bg-white transition-colors group cursor-pointer overflow-hidden min-h-[100px] flex items-center justify-center"
                     >
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept="image/*"
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
                         onChange={handleFileChange}
                       />
                       {ktpPhoto ? (
                         <div className="relative aspect-video w-full rounded-lg overflow-hidden">
-                          <img
-                            src={ktpPhoto}
-                            alt="KTP Preview"
-                            className="w-full h-full object-cover"
-                          />
+                          <img src={ktpPhoto} alt="KTP Preview" className="w-full h-full object-cover" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <p className="text-white text-xs font-bold">
-                              Ganti Foto
-                            </p>
+                            <p className="text-white text-xs font-bold">Ganti Foto</p>
                           </div>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-2">
-                          <Camera
-                            className="text-slate-400 group-hover:text-blue-500 transition-colors"
-                            size={24}
-                          />
-                          <p className="text-xs font-bold text-slate-500 group-hover:text-slate-700">
-                            Ambil Foto KTP
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            Pastikan foto jelas & tidak blur
-                          </p>
+                          <Camera className="text-slate-400 group-hover:text-blue-500 transition-colors" size={24} />
+                          <p className="text-xs font-bold text-slate-500 group-hover:text-slate-700">Ambil Foto KTP</p>
+                          <p className="text-[10px] text-slate-400">Pastikan foto jelas & tidak blur</p>
                         </div>
                       )}
                     </div>
@@ -321,7 +258,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     >
                       Verifikasi Sekarang
                     </button>
-
+                    
                     <button
                       type="button"
                       onClick={handleSkipKtp}

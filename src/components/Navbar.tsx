@@ -1,34 +1,12 @@
-import React, { useState, useEffect } from "react";
-import {
-  Search,
-  ShoppingCart,
-  User,
-  Heart,
-  Bell,
-  LogOut,
-  ChevronDown,
-  MapPin,
-  Plus,
-  X,
-  ShieldCheck,
-} from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import { useUser } from "../context/UserContext";
+import React, { useState, useEffect } from 'react';
+import { Search, ShoppingCart, User, Heart, Bell, LogOut, ChevronDown, MapPin, Plus, X, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useUser } from '../context/UserContext';
 
-const Tooltip = ({
-  children,
-  text,
-}: {
-  children: React.ReactNode;
-  text: string;
-}) => {
+const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => {
   const [show, setShow] = useState(false);
   return (
-    <div
-      className="relative flex flex-col items-center"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-    >
+    <div className="relative flex flex-col items-center" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
       {children}
       <AnimatePresence>
         {show && (
@@ -51,19 +29,12 @@ interface NavbarProps {
   onSearch: (query: string) => void;
   favoriteCount: number;
   cartCount: number;
-  onOpenAuth: (mode: "login" | "register") => void;
+  onOpenAuth: (mode: 'login' | 'register') => void;
   onOpenCart: () => void;
   onShowMyListings: () => void;
 }
 
-export default function Navbar({
-  onSearch,
-  favoriteCount,
-  cartCount,
-  onOpenAuth,
-  onOpenCart,
-  onShowMyListings,
-}: NavbarProps) {
+export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth, onOpenCart, onShowMyListings }: NavbarProps) {
   const { user, logout } = useUser();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -73,19 +44,9 @@ export default function Navbar({
         {/* Top bar - Professional Utility */}
         <div className="hidden lg:flex justify-between items-center py-2 text-[11px] border-b border-white/5 text-white/50 font-medium">
           <div className="flex gap-6">
-            <a
-              href="#"
-              className="hover:text-white transition-colors flex items-center gap-1.5"
-            >
-              <Bell size={12} /> Pusat Notifikasi
-            </a>
-            <a href="#" className="hover:text-white transition-colors">
-              Bantuan & Dukungan
-            </a>
-            <a
-              href="#"
-              className="hover:text-white transition-colors flex items-center gap-1.5"
-            >
+            <a href="#" className="hover:text-white transition-colors flex items-center gap-1.5"><Bell size={12} /> Pusat Notifikasi</a>
+            <a href="#" className="hover:text-white transition-colors">Bantuan & Dukungan</a>
+            <a href="#" className="hover:text-white transition-colors flex items-center gap-1.5">
               <MapPin size={12} className="text-white/30" />
               <span>Indonesia</span>
             </a>
@@ -93,11 +54,9 @@ export default function Navbar({
           <div className="flex gap-6 items-center">
             <div className="flex items-center gap-4 border-r border-white/10 pr-6 mr-2">
               <span className="cursor-pointer hover:text-white">ID | IDR</span>
-              <a href="#" className="hover:text-white transition-colors">
-                Jadi Mitra Properti
-              </a>
+              <a href="#" className="hover:text-white transition-colors">Jadi Mitra Properti</a>
             </div>
-
+            
             {user ? (
               <div className="flex items-center gap-3 group relative cursor-pointer">
                 <div className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center text-[10px] font-bold text-white/80">
@@ -110,41 +69,28 @@ export default function Navbar({
                   <div className="px-4 py-2 border-b border-white/5 mb-1">
                     <div className="flex items-center gap-1">
                       <p className="font-bold text-xs">{user.name}</p>
-                      {user.isKtpVerified ? (
-                        <ShieldCheck size={10} className="text-blue-400" />
-                      ) : (
-                        <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">
-                          UNVERIFIED
-                        </span>
-                      )}
+                      {user.isKtpVerified ? <ShieldCheck size={10} className="text-blue-400" /> : <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">UNVERIFIED</span>}
                     </div>
-                    <p className="text-[10px] text-white/40 truncate">
-                      {user.email}
-                    </p>
+                    <p className="text-[10px] text-white/40 truncate">{user.email}</p>
                   </div>
                   {!user.isKtpVerified && (
-                    <button
-                      onClick={() => onOpenAuth("register")}
+                    <button 
+                      onClick={() => onOpenAuth('register')}
                       className="w-full text-left px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-[11px] flex items-center gap-2 transition-colors text-amber-400"
                     >
                       <ShieldCheck size={14} /> Verifikasi KTP
                     </button>
                   )}
-                  <button className="w-full text-left px-4 py-2 hover:bg-white/5 text-[11px] flex items-center gap-2 transition-colors">
-                    <User size={14} className="text-white/30" /> Profil Saya
-                  </button>
-                  <button
+                  <button className="w-full text-left px-4 py-2 hover:bg-white/5 text-[11px] flex items-center gap-2 transition-colors"><User size={14} className="text-white/30" /> Profil Saya</button>
+                  <button 
                     onClick={onShowMyListings}
                     className="w-full text-left px-4 py-2 hover:bg-white/5 text-[11px] flex items-center gap-2 transition-colors"
                   >
                     <Plus size={14} className="text-white/30" /> Iklan Saya
                   </button>
-                  <button className="w-full text-left px-4 py-2 hover:bg-white/5 text-[11px] flex items-center gap-2 transition-colors">
-                    <ShoppingCart size={14} className="text-white/30" /> Pesanan
-                    Saya
-                  </button>
+                  <button className="w-full text-left px-4 py-2 hover:bg-white/5 text-[11px] flex items-center gap-2 transition-colors"><ShoppingCart size={14} className="text-white/30" /> Pesanan Saya</button>
                   <div className="border-t border-white/5 my-1" />
-                  <button
+                  <button 
                     onClick={logout}
                     className="w-full text-left px-4 py-2 hover:bg-white/5 text-[11px] text-rose-400 flex items-center gap-2 transition-colors"
                   >
@@ -154,18 +100,8 @@ export default function Navbar({
               </div>
             ) : (
               <div className="flex gap-4">
-                <button
-                  onClick={() => onOpenAuth("login")}
-                  className="hover:text-white transition-colors"
-                >
-                  Masuk
-                </button>
-                <button
-                  onClick={() => onOpenAuth("register")}
-                  className="bg-white text-slate-900 px-4 py-1.5 rounded-sm hover:bg-slate-100 transition-all font-bold"
-                >
-                  Daftar Sekarang
-                </button>
+                <button onClick={() => onOpenAuth('login')} className="hover:text-white transition-colors">Masuk</button>
+                <button onClick={() => onOpenAuth('register')} className="bg-white text-slate-900 px-4 py-1.5 rounded-sm hover:bg-slate-100 transition-all font-bold">Daftar Sekarang</button>
               </div>
             )}
           </div>
@@ -174,22 +110,18 @@ export default function Navbar({
         {/* Main Nav */}
         <div className="flex flex-col md:flex-row items-center gap-4 lg:gap-8 py-4 md:py-5">
           <div className="flex items-center justify-between w-full md:w-auto">
-            <motion.div
+            <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               className="flex items-center gap-3 cursor-pointer group"
-              onClick={() => onSearch("")}
+              onClick={() => onSearch('')}
             >
               <div className="bg-white text-slate-950 w-10 h-10 rounded-sm flex items-center justify-center font-bold text-xl transition-all group-hover:rounded-xl shadow-lg ring-1 ring-white/20">
                 G
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black tracking-tight leading-none text-white">
-                  GriyaStay
-                </span>
-                <span className="text-[9px] uppercase tracking-[0.2em] font-bold text-white/40">
-                  Exclusive Real Estate
-                </span>
+                <span className="text-xl font-black tracking-tight leading-none text-white">GriyaStay</span>
+                <span className="text-[9px] uppercase tracking-[0.2em] font-bold text-white/40">Exclusive Real Estate</span>
               </div>
             </motion.div>
 
@@ -205,7 +137,7 @@ export default function Navbar({
               </div>
               {user ? (
                 <div className="relative">
-                  <button
+                  <button 
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                     className="w-8 h-8 bg-white text-slate-950 rounded-full flex items-center justify-center text-xs font-bold ring-2 ring-white/20 active:scale-95 transition-all"
                   >
@@ -214,7 +146,7 @@ export default function Navbar({
 
                   <AnimatePresence>
                     {isMobileMenuOpen && (
-                      <motion.div
+                      <motion.div 
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -222,62 +154,50 @@ export default function Navbar({
                       >
                         <div className="px-4 pb-3 mb-2 border-b border-white/5">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-sm text-white">
-                              {user.name}
-                            </p>
+                            <p className="font-bold text-sm text-white">{user.name}</p>
                             {user.isKtpVerified ? (
-                              <ShieldCheck
-                                size={12}
-                                className="text-blue-400"
-                              />
+                              <ShieldCheck size={12} className="text-blue-400" />
                             ) : (
-                              <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">
-                                UNVERIFIED
-                              </span>
+                              <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">UNVERIFIED</span>
                             )}
                           </div>
-                          <p className="text-[10px] text-white/40 truncate">
-                            {user.email}
-                          </p>
+                          <p className="text-[10px] text-white/40 truncate">{user.email}</p>
                         </div>
                         <div className="flex flex-col">
                           {!user.isKtpVerified && (
-                            <button
+                             <button 
                               className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-sm transition-colors text-amber-400"
                               onClick={() => {
-                                onOpenAuth("register");
+                                onOpenAuth('register');
                                 setIsMobileMenuOpen(false);
                               }}
                             >
                               <ShieldCheck size={16} /> Verifikasi KTP Sekarang
                             </button>
                           )}
-                          <button
+                          <button 
                             className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm transition-colors text-white/70 hover:text-white"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
-                            <User size={16} className="text-white/30" /> Profil
-                            Saya
+                            <User size={16} className="text-white/30" /> Profil Saya
                           </button>
-                          <button
+                          <button 
                             className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm transition-colors text-white/70 hover:text-white"
                             onClick={() => {
                               onShowMyListings();
                               setIsMobileMenuOpen(false);
                             }}
                           >
-                            <Plus size={16} className="text-white/30" /> Iklan
-                            Saya
+                            <Plus size={16} className="text-white/30" /> Iklan Saya
                           </button>
-                          <button
+                          <button 
                             className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm transition-colors text-white/70 hover:text-white"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
-                            <ShoppingCart size={16} className="text-white/30" />{" "}
-                            Pesanan Saya
+                            <ShoppingCart size={16} className="text-white/30" /> Pesanan Saya
                           </button>
                           <div className="h-px bg-white/5 my-2" />
-                          <button
+                          <button 
                             className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm transition-colors text-rose-400 hover:text-rose-300"
                             onClick={() => {
                               logout();
@@ -292,8 +212,8 @@ export default function Navbar({
                   </AnimatePresence>
                 </div>
               ) : (
-                <button
-                  onClick={() => onOpenAuth("login")}
+                <button 
+                  onClick={() => onOpenAuth('login')}
                   className="p-1 text-white/80"
                 >
                   <User size={22} />
@@ -304,9 +224,9 @@ export default function Navbar({
 
           <div className="flex-1 w-full relative">
             <div className="relative group">
-              <input
-                type="text"
-                placeholder="Cari villa di Bali, Apartemen di Jakarta, atau Hotel di Bandung..."
+              <input 
+                type="text" 
+                placeholder="Cari villa di Bali, Apartemen di Jakarta, atau Hotel di Bandung..." 
                 onChange={(e) => onSearch(e.target.value)}
                 className="w-full py-3 px-5 pr-14 rounded-sm text-white border border-white/10 focus:outline-none focus:ring-4 focus:ring-white/5 bg-white/5 transition-all font-medium text-sm md:text-base placeholder:text-white/30 backdrop-blur-sm group-focus-within:bg-white/10 group-focus-within:border-white/20"
               />
@@ -321,9 +241,7 @@ export default function Navbar({
             <Tooltip text="Daftar Favorit Anda">
               <div className="flex flex-col items-center gap-0.5 cursor-pointer group text-white/60 hover:text-white transition-colors relative">
                 <Heart size={22} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">
-                  Favorit
-                </span>
+                <span className="text-[9px] font-bold uppercase tracking-wider">Favorit</span>
                 {favoriteCount > 0 && (
                   <span className="absolute -top-1 -right-0 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-slate-900">
                     {favoriteCount}
@@ -331,16 +249,14 @@ export default function Navbar({
                 )}
               </div>
             </Tooltip>
-
+            
             <Tooltip text="Keranjang Belanja">
-              <div
+              <div 
                 onClick={onOpenCart}
                 className="flex flex-col items-center gap-0.5 cursor-pointer group text-white/60 hover:text-white transition-colors relative"
               >
                 <ShoppingCart size={22} />
-                <span className="text-[9px] font-bold uppercase tracking-wider">
-                  Keranjang
-                </span>
+                <span className="text-[9px] font-bold uppercase tracking-wider">Keranjang</span>
                 {cartCount > 0 && (
                   <span className="absolute -top-1 -right-0 bg-white text-slate-950 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-slate-900">
                     {cartCount}
@@ -350,74 +266,58 @@ export default function Navbar({
             </Tooltip>
 
             <div className="w-px h-8 bg-white/10 mx-1" />
-
+            
             <Tooltip text={user ? "Atur Profil & Akun" : "Masuk ke Akun Anda"}>
               <div className="relative group/profile px-1">
                 {user ? (
                   <>
                     <div className="flex items-center gap-3 cursor-pointer group">
                       <div className="text-right hidden xl:block">
-                        <p className="text-[10px] text-white/40 font-bold uppercase">
-                          Membership Elite
-                        </p>
-                        <p className="text-xs font-bold text-white">
-                          {user.name}
-                        </p>
+                        <p className="text-[10px] text-white/40 font-bold uppercase">Membership Elite</p>
+                        <p className="text-xs font-bold text-white">{user.name}</p>
                       </div>
                       <div className="w-10 h-10 bg-white text-slate-950 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ring-1 ring-white/20 border-2 border-slate-900 group-hover:scale-110 transition-transform">
                         {user.name.charAt(0)}
                       </div>
-                      <ChevronDown
-                        size={14}
-                        className="text-white/40 group-hover:text-white transition-colors ml-[-4px]"
-                      />
+                      <ChevronDown size={14} className="text-white/40 group-hover:text-white transition-colors ml-[-4px]" />
                     </div>
-
+                    
                     {/* Desktop/Tablet Profile Dropdown */}
                     <div className="absolute top-full right-0 mt-3 w-56 bg-slate-950 text-white rounded-sm shadow-2xl opacity-0 invisible group-hover/profile:opacity-100 group-hover/profile:visible transition-all py-3 z-[100] border border-white/10 backdrop-blur-xl">
                       <div className="px-4 pb-3 mb-2 border-b border-white/5">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-white">
-                            {user.name}
-                          </p>
+                          <p className="font-bold text-sm text-white">{user.name}</p>
                           {user.isKtpVerified ? (
                             <ShieldCheck size={12} className="text-blue-400" />
                           ) : (
-                            <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">
-                              UNVERIFIED
-                            </span>
+                            <span className="text-[8px] bg-amber-500 text-white px-1 rounded-sm font-bold">UNVERIFIED</span>
                           )}
                         </div>
-                        <p className="text-[10px] text-white/40 truncate">
-                          {user.email}
-                        </p>
+                        <p className="text-[10px] text-white/40 truncate">{user.email}</p>
                       </div>
                       <div className="flex flex-col">
                         {!user.isKtpVerified && (
-                          <button
+                          <button 
                             className="flex items-center gap-3 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-[11px] transition-colors text-amber-400"
-                            onClick={() => onOpenAuth("register")}
+                            onClick={() => onOpenAuth('register')}
                           >
                             <ShieldCheck size={14} /> Verifikasi KTP
                           </button>
                         )}
                         <button className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-white/70 hover:text-white">
-                          <User size={14} className="text-white/30" /> Profil
-                          Saya
+                          <User size={14} className="text-white/30" /> Profil Saya
                         </button>
-                        <button
+                        <button 
                           onClick={onShowMyListings}
                           className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-white/70 hover:text-white"
                         >
-                          <Plus size={14} className="text-white/30" /> Iklan
-                          Saya
+                          <Plus size={14} className="text-white/30" /> Iklan Saya
                         </button>
                         <button className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-white/70 hover:text-white">
-                          <ShoppingCart size={14} className="text-white/30" />{" "}
-                          Pesanan Saya
+                          <ShoppingCart size={14} className="text-white/30" /> Pesanan Saya
                         </button>
                         <div className="h-px bg-white/5 my-1" />
-                        <button
+                        <button 
                           onClick={logout}
                           className="flex items-center gap-3 px-4 py-2 hover:bg-white/5 text-[11px] transition-colors text-rose-400 hover:text-rose-300"
                         >
@@ -427,20 +327,16 @@ export default function Navbar({
                     </div>
                   </>
                 ) : (
-                  <div
-                    onClick={() => onOpenAuth("login")}
+                  <div 
+                    onClick={() => onOpenAuth('login')}
                     className="flex items-center gap-3 group cursor-pointer"
                   >
                     <div className="w-10 h-10 bg-white/5 text-white/40 rounded-full flex items-center justify-center transition-colors group-hover:bg-white/10 group-hover:text-white/80 ring-1 ring-white/10">
                       <User size={22} />
                     </div>
                     <div className="text-left hidden lg:block">
-                      <p className="text-[10px] text-white/40 font-bold uppercase">
-                        Selamat Datang
-                      </p>
-                      <p className="text-xs font-bold text-white transition-colors group-hover:text-blue-300 underline underline-offset-2">
-                        Login / Daftar
-                      </p>
+                      <p className="text-[10px] text-white/40 font-bold uppercase">Selamat Datang</p>
+                      <p className="text-xs font-bold text-white transition-colors group-hover:text-blue-300 underline underline-offset-2">Login / Daftar</p>
                     </div>
                   </div>
                 )}
@@ -450,5 +346,6 @@ export default function Navbar({
         </div>
       </div>
     </nav>
+
   );
 }
