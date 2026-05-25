@@ -81,6 +81,10 @@ export async function fetchSupabaseProperties(): Promise<Property[] | null> {
       .order('created_at', { ascending: false });
 
     if (error) {
+      if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('fetch'))) {
+        console.warn('⚠️ Supabase service is currently unreachable (Failed to Fetch). Check your VITE_SUPABASE_URL database configuration or internet connection. Falling back to local offline mode.');
+        return null;
+      }
       console.error('Error fetching properties from Supabase:', error.message);
       throw error;
     }
@@ -89,8 +93,12 @@ export async function fetchSupabaseProperties(): Promise<Property[] | null> {
       return data.map(convertFromDb);
     }
     return [];
-  } catch (err) {
-    console.error('Supabase fetch failed:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
+      console.warn('⚠️ Supabase connection is offline or unreachable. GriyaStay is operating gracefully using local fallback storage.');
+    } else {
+      console.error('Supabase fetch failed:', err);
+    }
     return null;
   }
 }
@@ -108,6 +116,10 @@ export async function upsertSupabaseProperty(prop: Property): Promise<Property |
       .select();
 
     if (error) {
+      if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('fetch'))) {
+        console.warn('⚠️ Supabase database currently unreachable during custom property upsert. Saved locally.');
+        return null;
+      }
       console.error('Error upserting property in Supabase:', error.message);
       throw error;
     }
@@ -116,8 +128,12 @@ export async function upsertSupabaseProperty(prop: Property): Promise<Property |
       return convertFromDb(data[0]);
     }
     return null;
-  } catch (err) {
-    console.error('Supabase upsert failed:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
+      console.warn('⚠️ Supabase connection offline during property registration. Operating in local-only mode.');
+    } else {
+      console.error('Supabase upsert failed:', err);
+    }
     return null;
   }
 }
@@ -134,12 +150,20 @@ export async function deleteSupabaseProperty(id: string): Promise<boolean> {
       .eq('id', id);
 
     if (error) {
+      if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('fetch'))) {
+        console.warn('⚠️ Supabase database unreachable during property deletion.');
+        return false;
+      }
       console.error('Error deleting property from Supabase:', error.message);
       throw error;
     }
     return true;
-  } catch (err) {
-    console.error('Supabase delete failed:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
+      console.warn('⚠️ Supabase connection offline during property deletion. Operating in local-only mode.');
+    } else {
+      console.error('Supabase delete failed:', err);
+    }
     return false;
   }
 }
@@ -166,6 +190,10 @@ export async function fetchSupabaseUser(email: string): Promise<SupabaseUser | n
       .maybeSingle();
 
     if (error) {
+      if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('fetch'))) {
+        console.warn('⚠️ Supabase database unreachable during user profile fetch.');
+        return null;
+      }
       console.error('Error fetching user from Supabase:', error.message);
       throw error;
     }
@@ -181,8 +209,12 @@ export async function fetchSupabaseUser(email: string): Promise<SupabaseUser | n
       };
     }
     return null;
-  } catch (err) {
-    console.error('Supabase fetch user failed:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
+      console.warn('⚠️ Supabase connection offline during user profile fetch. GriyaStay utilizing local storage.');
+    } else {
+      console.error('Supabase fetch user failed:', err);
+    }
     return null;
   }
 }
@@ -197,6 +229,7 @@ export async function upsertSupabaseUser(user: SupabaseUser): Promise<SupabaseUs
       id: user.id,
       name: user.name,
       email: user.email.trim().toLowerCase(),
+      is_promo_eligible: true, // safe default for client profiles
       is_ktp_verified: user.isKtpVerified,
       ktp_number: user.ktpNumber || null,
       ktp_photo: user.ktpPhoto || null,
@@ -208,6 +241,10 @@ export async function upsertSupabaseUser(user: SupabaseUser): Promise<SupabaseUs
       .select();
 
     if (error) {
+      if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('fetch'))) {
+        console.warn('⚠️ Supabase database unreachable during user profile saving.');
+        return null;
+      }
       console.error('Error upserting user in Supabase:', error.message);
       throw error;
     }
@@ -223,8 +260,12 @@ export async function upsertSupabaseUser(user: SupabaseUser): Promise<SupabaseUs
       };
     }
     return null;
-  } catch (err) {
-    console.error('Supabase upsert user failed:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')) {
+      console.warn('⚠️ Supabase connection offline during user registration. Utilizing local storage profiles.');
+    } else {
+      console.error('Supabase upsert user failed:', err);
+    }
     return null;
   }
 }

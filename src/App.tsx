@@ -62,17 +62,27 @@ export default function App() {
       const loadSupabaseData = async () => {
         const data = await fetchSupabaseProperties();
         if (data) {
-          // If Supabase table is completely empty, automatically bootstrap with mock properties for immediate testing
-          if (data.length === 0) {
-            console.log("Empty Supabase table detected. Bootstrapping initial properties...");
+          // If Supabase table is empty or has very few properties (e.g. fewer than 15),
+          // automatically seed with any missing mock properties to guarantee a rich catalog.
+          if (data.length < 15) {
+            console.log("Few records in Supabase, auto-seeding remaining mockProperties...");
+            let updated = false;
             for (const item of mockProperties) {
-              await upsertSupabaseProperty(item);
+              const matches = data.some(existing => existing.id === item.id || existing.title.toLowerCase() === item.title.toLowerCase());
+              if (!matches) {
+                await upsertSupabaseProperty(item);
+                updated = true;
+              }
             }
-            const reloaded = await fetchSupabaseProperties();
-            if (reloaded) setProperties(reloaded);
-          } else {
-            setProperties(data);
+            if (updated) {
+              const reloaded = await fetchSupabaseProperties();
+              if (reloaded) {
+                setProperties(reloaded);
+                return;
+              }
+            }
           }
+          setProperties(data);
         }
       };
 
@@ -103,10 +113,15 @@ export default function App() {
       const bootstrapFirebase = async () => {
         try {
           const querySnapshot = await getDocs(propertiesCollection);
-          if (querySnapshot.empty) {
-            console.log("Empty cloud database, bootstrapping initial mockProperties...");
+          // If Firestore is empty or holds fewer than 15 properties, enrich with missing mock properties
+          if (querySnapshot.size < 15) {
+            console.log("Few records in Cloud Firestore, bootstrapping remaining mockProperties...");
+            const currentIds = querySnapshot.docs.map(docSnap => docSnap.id);
+            const currentTitles = querySnapshot.docs.map(docSnap => (docSnap.data() as any).title?.toLowerCase());
             for (const item of mockProperties) {
-              await setDoc(doc(db, 'properties', item.id), item);
+              if (!currentIds.includes(item.id) && !currentTitles.includes(item.title.toLowerCase())) {
+                await setDoc(doc(db, 'properties', item.id), item);
+              }
             }
           }
         } catch (error) {
@@ -236,6 +251,13 @@ export default function App() {
       try {
         const result = await upsertSupabaseProperty(cleanDoc);
         if (result) {
+          setProperties(prev => {
+            const exists = prev.some(p => p.id === result.id);
+            if (exists) {
+              return prev.map(p => p.id === result.id ? result : p);
+            }
+            return [result, ...prev];
+          });
           setIsSellModalOpen(false);
           addToast('Properti Anda berhasil didaftarkan!', 'success');
         } else {
@@ -359,6 +381,7 @@ export default function App() {
       try {
         const success = await deleteSupabaseProperty(id);
         if (success) {
+          setProperties(prev => prev.filter(p => p.id !== id));
           addToast(`Properti berhasil dihapus dari database GriyaStay.`, 'info');
           if (selectedProperty && selectedProperty.id === id) {
             setSelectedProperty(null);
@@ -409,7 +432,7 @@ export default function App() {
       const matchesTab = 
         activeTab === 'all' || 
         activeTab === 'near' || // Near is mocked to show all for now
-        (activeTab === 'mine' ? (user && p.ownerId === user.email) : 
+        (activeTab === 'mine' ? (user && (p.ownerId === user.email || p.ownerId === user.id)) : 
          activeTab === 'promo' ? p.isPromo : p.type === activeTab);
       
       const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 

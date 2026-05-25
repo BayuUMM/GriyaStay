@@ -75,7 +75,7 @@ export default function PropertyCard({
         {/* Overlay Gradients */}
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate-900/60 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
         
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
           {property.isPromo && (
             <div className="bg-yellow-400 text-slate-900 text-[9px] font-black px-2 py-0.5 rounded-sm uppercase shadow-lg flex items-center gap-1">
               EXCLUSIVE
@@ -86,17 +86,15 @@ export default function PropertyCard({
           }`}>
             {property.type === 'hotel' ? 'Booking' : property.type === 'house' ? 'Sale' : 'Apartment'}
           </div>
-        </div>
-        
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
+          
           <button 
             onClick={(e) => {
               e.stopPropagation();
               if (onOpenVR) onOpenVR(property);
             }}
-            className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border border-white/20 hover:bg-slate-950 transition-all shadow-xl"
+            className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md text-white px-2 py-1 rounded-sm text-[8px] font-black uppercase tracking-[0.1em] border border-white/20 hover:bg-slate-950 transition-all shadow-xl mt-0.5"
           >
-            <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+            <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse" />
             360° VR
           </button>
         </div>
