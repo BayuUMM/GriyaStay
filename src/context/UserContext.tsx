@@ -31,9 +31,9 @@ interface User {
 
 interface UserContextType {
   user: User | null;
-  login: (email: string, name: string) => Promise<void>;
-  register: (email: string, name: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  login: (email: string, name: string) => Promise<User | null>;
+  register: (email: string, name: string) => Promise<User | null>;
+  loginWithGoogle: () => Promise<User | null>;
   logout: () => Promise<void>;
   verifyKtp: (ktpNumber?: string, ktpPhoto?: string) => Promise<void>;
   isFirebaseReady: boolean;
@@ -153,7 +153,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, name: string) => {
+  const login = async (email: string, name: string): Promise<User | null> => {
     if (!isFirebasePlaceholder) {
       console.warn("Using local storage fallback for form credentials. Google Login is recommended.");
     }
@@ -204,9 +204,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setUser(activeUser);
     localStorage.setItem('griyastay_user', JSON.stringify(activeUser));
+    return activeUser;
   };
 
-  const register = async (email: string, name: string) => {
+  const register = async (email: string, name: string): Promise<User | null> => {
     let activeUser: User;
     const generatedId = Math.random().toString(36).substr(2, 9);
     
@@ -240,9 +241,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     setUser(activeUser);
     localStorage.setItem('griyastay_user', JSON.stringify(activeUser));
+    return activeUser;
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (): Promise<User | null> => {
     if (isFirebasePlaceholder) {
       // In local debug/preview, simulate Google Identity Callback
       const googleMockUser = {
@@ -291,12 +293,80 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       setUser(activeUser);
       localStorage.setItem('griyastay_user', JSON.stringify(activeUser));
-      return;
+      return activeUser;
     }
 
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+      if (firebaseUser) {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        let userData: User | null = null;
+        try {
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const dbData = userDoc.data();
+            userData = {
+              id: firebaseUser.uid,
+              name: dbData.name || firebaseUser.displayName || 'Guest',
+              email: dbData.email || firebaseUser.email || '',
+              isKtpVerified: dbData.isKtpVerified || false,
+              ktpNumber: dbData.ktpNumber,
+              ktpPhoto: dbData.ktpPhoto,
+            };
+          } else {
+            userData = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Guest',
+              email: firebaseUser.email || '',
+              isKtpVerified: false,
+            };
+            await setDoc(userDocRef, {
+              name: userData.name,
+              email: userData.email,
+              isKtpVerified: userData.isKtpVerified,
+            });
+          }
+          
+          if (isSupabaseConfigured && userData) {
+            try {
+              const existingSupa = await fetchSupabaseUser(userData.email);
+              if (existingSupa) {
+                userData = {
+                  ...userData,
+                  isKtpVerified: existingSupa.isKtpVerified || userData.isKtpVerified,
+                  ktpNumber: existingSupa.ktpNumber || userData.ktpNumber,
+                  ktpPhoto: existingSupa.ktpPhoto || userData.ktpPhoto,
+                };
+              }
+              await upsertSupabaseUser({
+                id: userData.id,
+                name: userData.name,
+                email: userData.email,
+                isKtpVerified: userData.isKtpVerified,
+                ktpNumber: userData.ktpNumber,
+                ktpPhoto: userData.ktpPhoto
+              });
+            } catch (supaErr) {
+              console.error("Syncing google user to Supabase failed:", supaErr);
+            }
+          }
+        } catch (error) {
+          console.warn("Firestore user sync error on loginWithGoogle:", error);
+          userData = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'Guest',
+            email: firebaseUser.email || '',
+            isKtpVerified: false,
+          };
+        }
+        
+        setUser(userData);
+        localStorage.setItem('griyastay_user', JSON.stringify(userData));
+        return userData;
+      }
+      return null;
     } catch (error) {
       console.error("Google Auth failed:", error);
       throw error;

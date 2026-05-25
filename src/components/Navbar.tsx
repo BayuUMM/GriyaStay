@@ -98,12 +98,7 @@ export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth,
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="flex gap-4">
-                <button onClick={() => onOpenAuth('login')} className="hover:text-white transition-colors">Masuk</button>
-                <button onClick={() => onOpenAuth('register')} className="bg-white text-slate-900 px-4 py-1.5 rounded-sm hover:bg-slate-100 transition-all font-bold">Daftar Sekarang</button>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
 
