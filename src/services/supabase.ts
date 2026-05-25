@@ -225,27 +225,123 @@ export async function fetchSupabaseUser(email: string): Promise<SupabaseUser | n
 export async function upsertSupabaseUser(user: SupabaseUser): Promise<SupabaseUser | null> {
   if (!supabase) return null;
   try {
+    const userEmail = user.email.trim().toLowerCase();
+    
+    // First, check if user exists in the public.users table by email
+    const { data: existingUsers, error: checkError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', userEmail);
+
+    if (checkError) {
+      console.warn('Error checking user existence in Supabase:', checkError.message);
+    }
+
+    const existingUser = existingUsers && existingUsers.length > 0 ? existingUsers[0] : null;
+
     const dbData = {
-      id: user.id,
       name: user.name,
-      email: user.email.trim().toLowerCase(),
+      email: userEmail,
       is_promo_eligible: true, // safe default for client profiles
       is_ktp_verified: user.isKtpVerified,
       ktp_number: user.ktpNumber || null,
       ktp_photo: user.ktpPhoto || null,
     };
 
-    const { data, error } = await supabase
-      .from('users')
-      .upsert(dbData, { onConflict: 'email' })
-      .select();
+    let queryResult;
+
+    if (existingUser) {
+      // Update existing record using email (safer than ID if local fallback IDs are used)
+      console.log('User exists in Supabase. Performing UPDATE for:', userEmail);
+      queryResult = await supabase
+        .from('users')
+        .update({
+          name: dbData.name,
+          is_ktp_verified: dbData.is_ktp_verified,
+          ktp_number: dbData.ktp_number,
+          ktp_photo: dbData.ktp_photo,
+        })
+        .eq('email', userEmail)
+        .select();
+    } else {
+      // Insert new record
+      console.log('User does not exist in Supabase. Performing INSERT for:', userEmail);
+      
+      const insertData = {
+        id: user.id,
+        ...dbData
+      };
+      
+      queryResult = await supabase
+        .from('users')
+        .insert(insertData)
+        .select();
+    }
+
+    const { data, error } = queryResult;
 
     if (error) {
       if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('fetch'))) {
         console.warn('⚠️ Supabase database unreachable during user profile saving.');
         return null;
       }
-      console.error('Error upserting user in Supabase:', error.message);
+      
+      console.error('Error during users insert/update in Supabase:', error.message, error.details);
+      
+      // Fallback 1: If it's an INSERT and failed with UUID formatting issue (e.g. error code '22P02'),
+      // try to generate a clean, valid UUID v4 format and retry!
+      if (!existingUser && (error.code === '22P02' || error.message.toLowerCase().includes('uuid'))) {
+        const compliantUuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+        console.log(`UUID format error detected for ID "${user.id}". Retrying INSERT with a compliant UUID v4: "${compliantUuid}"...`);
+        
+        const retryWithUuid = await supabase
+          .from('users')
+          .insert({
+            id: compliantUuid,
+            ...dbData
+          })
+          .select();
+          
+        if (!retryWithUuid.error && retryWithUuid.data && retryWithUuid.data[0]) {
+          console.log('INSERT with compliant UUID succeeded!');
+          const row = retryWithUuid.data[0];
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            isKtpVerified: row.is_ktp_verified ?? false,
+            ktpNumber: row.ktp_number,
+            ktpPhoto: row.ktp_photo,
+          };
+        }
+        
+        // Fallback 2: If the retry with compliant UUID also fails, try completely without ID so Postgres can auto-generate it!
+        console.log('Retrying INSERT completely without specifying ID (letting database auto-generate key)...');
+        const retryWithoutId = await supabase
+          .from('users')
+          .insert(dbData)
+          .select();
+          
+        if (!retryWithoutId.error && retryWithoutId.data && retryWithoutId.data[0]) {
+          console.log('Fallback insert succeeded without ID!');
+          const row = retryWithoutId.data[0];
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            isKtpVerified: row.is_ktp_verified ?? false,
+            ktpNumber: row.ktp_number,
+            ktpPhoto: row.ktp_photo,
+          };
+        } else if (retryWithoutId.error) {
+          console.error('All fallbacks failed. Fallback insert failed also:', retryWithoutId.error.message);
+        }
+      }
+      
       throw error;
     }
 
