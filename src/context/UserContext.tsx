@@ -11,13 +11,16 @@ import {
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut,
-  updateProfile
+  updateProfile,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { 
   isSupabaseConfigured, 
   fetchSupabaseUser, 
-  upsertSupabaseUser 
+  upsertSupabaseUser,
+  supabase
 } from '../services/supabase';
 
 interface User {
@@ -31,8 +34,8 @@ interface User {
 
 interface UserContextType {
   user: User | null;
-  login: (email: string, name: string) => Promise<User | null>;
-  register: (email: string, name: string) => Promise<User | null>;
+  login: (email: string, password?: string, name?: string) => Promise<User | null>;
+  register: (email: string, password?: string, name?: string) => Promise<User | null>;
   loginWithGoogle: () => Promise<User | null>;
   logout: () => Promise<void>;
   verifyKtp: (ktpNumber?: string, ktpPhoto?: string) => Promise<void>;
@@ -153,28 +156,213 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, name: string): Promise<User | null> => {
-    if (!isFirebasePlaceholder) {
-      console.warn("Using local storage fallback for form credentials. Google Login is recommended.");
+  // Real-time synchronization of the logged-in user profile from Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !user?.email) {
+      return;
     }
-    
-    let activeUser: User;
-    
-    if (isSupabaseConfigured) {
+
+    const loadUserRealtime = async () => {
       try {
-        const existingSupabaseUser = await fetchSupabaseUser(email);
-        if (existingSupabaseUser) {
+        const latestInfo = await fetchSupabaseUser(user.email);
+        if (latestInfo) {
+          setUser(prev => {
+            if (!prev) return null;
+            if (
+              prev.isKtpVerified !== latestInfo.isKtpVerified ||
+              prev.name !== latestInfo.name ||
+              prev.ktpNumber !== latestInfo.ktpNumber ||
+              prev.ktpPhoto !== latestInfo.ktpPhoto
+            ) {
+              const updated = {
+                ...prev,
+                name: latestInfo.name,
+                isKtpVerified: latestInfo.isKtpVerified,
+                ktpNumber: latestInfo.ktpNumber,
+                ktpPhoto: latestInfo.ktpPhoto,
+              };
+              localStorage.setItem('griyastay_user', JSON.stringify(updated));
+              return updated;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.warn("Realtime user fetch failed:", err);
+      }
+    };
+
+    const userChannel = supabase
+      .channel(`supabase-user-changes-${user.email}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'users',
+          filter: `email=eq.${user.email.toLowerCase()}` 
+        },
+        (payload) => {
+          console.log("Real-time user changes payload received from Supabase:", payload);
+          loadUserRealtime();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(userChannel);
+    };
+  }, [user?.email]);
+
+  const login = async (email: string, password?: string, name?: string): Promise<User | null> => {
+    let activeUser: User | null = null;
+
+    if (!isFirebasePlaceholder && auth && password) {
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const firebaseUser = userCredential.user;
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const dbData = userDoc.data();
           activeUser = {
-            id: existingSupabaseUser.id,
-            name: existingSupabaseUser.name,
-            email: existingSupabaseUser.email,
-            isKtpVerified: existingSupabaseUser.isKtpVerified,
-            ktpNumber: existingSupabaseUser.ktpNumber,
-            ktpPhoto: existingSupabaseUser.ktpPhoto,
+            id: firebaseUser.uid,
+            name: dbData.name || firebaseUser.displayName || name || 'User',
+            email: dbData.email || firebaseUser.email || email,
+            isKtpVerified: dbData.isKtpVerified || false,
+            ktpNumber: dbData.ktpNumber,
+            ktpPhoto: dbData.ktpPhoto,
           };
         } else {
-          // If user does not exist in Supabase, create/register him in Supabase
-          const generatedId = Math.random().toString(36).substr(2, 9);
+          activeUser = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || name || 'User',
+            email: firebaseUser.email || email,
+            isKtpVerified: false,
+          };
+          await setDoc(userDocRef, {
+            name: activeUser.name,
+            email: activeUser.email,
+            isKtpVerified: activeUser.isKtpVerified,
+          });
+        }
+      } catch (fbErr: any) {
+        console.error("Firebase Auth login failed, trying Supabase fallback:", fbErr);
+        if (fbErr.code === 'auth/wrong-password' || fbErr.code === 'auth/invalid-credential') {
+          throw new Error('Kata sandi salah atau email tidak valid.');
+        } else if (fbErr.code === 'auth/user-not-found') {
+          throw new Error('Email tidak ditemukan. Silakan daftar terlebih dahulu.');
+        } else {
+          throw fbErr;
+        }
+      }
+    }
+
+    if (!activeUser) {
+      if (isSupabaseConfigured) {
+        try {
+          const existingSupabaseUser = await fetchSupabaseUser(email);
+          if (existingSupabaseUser) {
+            activeUser = {
+              id: existingSupabaseUser.id,
+              name: existingSupabaseUser.name,
+              email: existingSupabaseUser.email,
+              isKtpVerified: existingSupabaseUser.isKtpVerified,
+              ktpNumber: existingSupabaseUser.ktpNumber,
+              ktpPhoto: existingSupabaseUser.ktpPhoto,
+            };
+          } else {
+            const generatedId = Math.random().toString(36).substr(2, 9);
+            const response = await upsertSupabaseUser({
+              id: generatedId,
+              name: name || 'User',
+              email,
+              isKtpVerified: false,
+            });
+            if (response) {
+              activeUser = {
+                id: response.id,
+                name: response.name,
+                email: response.email,
+                isKtpVerified: response.isKtpVerified,
+                ktpNumber: response.ktpNumber,
+                ktpPhoto: response.ktpPhoto,
+              };
+            } else {
+              activeUser = { id: generatedId, email, name: name || 'User', isKtpVerified: false };
+            }
+          }
+        } catch (err) {
+          console.error("Supabase login connection error:", err);
+          activeUser = { id: Math.random().toString(36).substr(2, 9), email, name: name || 'User', isKtpVerified: false };
+        }
+      } else {
+        activeUser = { id: Math.random().toString(36).substr(2, 9), email, name: name || 'User', isKtpVerified: false };
+      }
+    }
+
+    if (isSupabaseConfigured && activeUser) {
+      try {
+        await upsertSupabaseUser({
+          id: activeUser.id,
+          name: activeUser.name,
+          email: activeUser.email,
+          isKtpVerified: activeUser.isKtpVerified,
+          ktpNumber: activeUser.ktpNumber,
+          ktpPhoto: activeUser.ktpPhoto
+        });
+      } catch (e) {
+        console.warn("Syncing login user to Supabase failed:", e);
+      }
+    }
+
+    setUser(activeUser);
+    localStorage.setItem('griyastay_user', JSON.stringify(activeUser));
+    return activeUser;
+  };
+
+  const register = async (email: string, password?: string, name?: string): Promise<User | null> => {
+    let activeUser: User | null = null;
+    const generatedId = Math.random().toString(36).substr(2, 9);
+
+    if (!isFirebasePlaceholder && auth && password) {
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const firebaseUser = userCredential.user;
+
+        if (name) {
+          await updateProfile(firebaseUser, { displayName: name });
+        }
+
+        activeUser = {
+          id: firebaseUser.uid,
+          name: name || 'User',
+          email: firebaseUser.email || email,
+          isKtpVerified: false,
+        };
+
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        await setDoc(userDocRef, {
+          name: activeUser.name,
+          email: activeUser.email,
+          isKtpVerified: false,
+        });
+      } catch (fbErr: any) {
+        console.error("Firebase Auth Sign up failed, trying Supabase fallback:", fbErr);
+        if (fbErr.code === 'auth/email-already-in-use') {
+          throw new Error('Email ini sudah terdaftar. Silakan login.');
+        } else if (fbErr.code === 'auth/weak-password') {
+          throw new Error('Kata sandi terlalu lemah. Minimal 6 karakter.');
+        } else {
+          throw fbErr;
+        }
+      }
+    }
+
+    if (!activeUser) {
+      if (isSupabaseConfigured) {
+        try {
           const response = await upsertSupabaseUser({
             id: generatedId,
             name: name || 'User',
@@ -193,50 +381,28 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           } else {
             activeUser = { id: generatedId, email, name: name || 'User', isKtpVerified: false };
           }
+        } catch (err) {
+          console.error("Supabase register connection error:", err);
+          activeUser = { id: generatedId, email, name: name || 'User', isKtpVerified: false };
         }
-      } catch (err) {
-        console.error("Supabase login connection error:", err);
-        activeUser = { id: Math.random().toString(36).substr(2, 9), email, name, isKtpVerified: false };
+      } else {
+        activeUser = { id: generatedId, email, name: name || 'User', isKtpVerified: false };
       }
-    } else {
-      activeUser = { id: Math.random().toString(36).substr(2, 9), email, name, isKtpVerified: false };
     }
 
-    setUser(activeUser);
-    localStorage.setItem('griyastay_user', JSON.stringify(activeUser));
-    return activeUser;
-  };
-
-  const register = async (email: string, name: string): Promise<User | null> => {
-    let activeUser: User;
-    const generatedId = Math.random().toString(36).substr(2, 9);
-    
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && activeUser) {
       try {
-        const response = await upsertSupabaseUser({
-          id: generatedId,
-          name,
-          email,
-          isKtpVerified: false,
+        await upsertSupabaseUser({
+          id: activeUser.id,
+          name: activeUser.name,
+          email: activeUser.email,
+          isKtpVerified: activeUser.isKtpVerified,
+          ktpNumber: activeUser.ktpNumber,
+          ktpPhoto: activeUser.ktpPhoto
         });
-        if (response) {
-          activeUser = {
-            id: response.id,
-            name: response.name,
-            email: response.email,
-            isKtpVerified: response.isKtpVerified,
-            ktpNumber: response.ktpNumber,
-            ktpPhoto: response.ktpPhoto,
-          };
-        } else {
-          activeUser = { id: generatedId, email, name, isKtpVerified: false };
-        }
-      } catch (err) {
-        console.error("Supabase register connection error:", err);
-        activeUser = { id: generatedId, email, name, isKtpVerified: false };
+      } catch (e) {
+        console.warn("Syncing registered user to Supabase failed:", e);
       }
-    } else {
-      activeUser = { id: generatedId, email, name, isKtpVerified: false };
     }
 
     setUser(activeUser);

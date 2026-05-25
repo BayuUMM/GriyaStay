@@ -56,7 +56,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
     setLoading(true);
     try {
       if (mode === 'login') {
-        const loggedInUser = await login(email, 'User');
+        const loggedInUser = await login(email, password, 'User');
         if (loggedInUser) {
           if (loggedInUser.isKtpVerified) {
             onClose();
@@ -67,7 +67,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
           setError('Gagal masuk. Silakan periksa kembali email Anda.');
         }
       } else if (mode === 'register') {
-        const registeredUser = await register(email, name);
+        const registeredUser = await register(email, password, name);
         if (registeredUser) {
           if (registeredUser.isKtpVerified) {
             onClose();
