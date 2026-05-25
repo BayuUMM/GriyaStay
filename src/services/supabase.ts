@@ -242,7 +242,6 @@ export async function upsertSupabaseUser(user: SupabaseUser): Promise<SupabaseUs
     const dbData = {
       name: user.name,
       email: userEmail,
-      is_promo_eligible: true, // safe default for client profiles
       is_ktp_verified: user.isKtpVerified,
       ktp_number: user.ktpNumber || null,
       ktp_photo: user.ktpPhoto || null,
