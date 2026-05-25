@@ -1,9 +1,38 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+// Safe wrapper to retrieve API keys without throwing "process is not defined" in browser builders like Vercel
+const getGeminiApiKey = (): string => {
+  try {
+    // 1. Try to read from Vite's official public build variables
+    const viteEnv = (import.meta as any).env || {};
+    if (viteEnv.VITE_GEMINI_API_KEY) {
+      return viteEnv.VITE_GEMINI_API_KEY.trim();
+    }
+    
+    // 2. Try to read from process.env with safe lookup
+    if (typeof process !== 'undefined' && process.env) {
+      return (process.env.GEMINI_API_KEY || '').trim();
+    }
+  } catch (e) {
+    console.warn("Environmental check failed in client, defaulting to empty key:", e);
+  }
+  return '';
+};
+
+const apiKey = getGeminiApiKey();
+
+// Safe initialization of GoogleGenAI client (lazy / nullable fallback)
+const ai = apiKey && !apiKey.includes('placeholder')
+  ? new GoogleGenAI({ apiKey }) 
+  : null;
 
 export const chatAssistant = async (message: string, history: { role: 'user' | 'model', parts: { text: string }[] }[] = [], propertiesContext: string) => {
   try {
+    if (!ai) {
+      console.warn("Gemini API Client is unconfigured. VITE_GEMINI_API_KEY environment variable is missing.");
+      return "Halo! Layanan asisten AI GriyaStay belum aktif karena VITE_GEMINI_API_KEY belum dikonfigurasi di environment variables Anda (Vercel/Hosting). Silakan hubungi pemilik website atau hubungi kami langsung via kontak hubungi kami. Terima kasih!";
+    }
+
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
@@ -30,6 +59,6 @@ export const chatAssistant = async (message: string, history: { role: 'user' | '
     return response.text;
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Maaf, saya sedang mengalami kendala teknis. Silakan coba lagi nanti.";
+    return "Maaf, asisten AI sedang mengalami kendala teknis saat menghubungi server Gemini. Silakan coba kembali sesaat lagi.";
   }
 };
