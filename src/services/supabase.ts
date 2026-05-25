@@ -143,3 +143,89 @@ export async function deleteSupabaseProperty(id: string): Promise<boolean> {
     return false;
   }
 }
+
+export interface SupabaseUser {
+  id: string;
+  name: string;
+  email: string;
+  isKtpVerified: boolean;
+  ktpNumber?: string;
+  ktpPhoto?: string;
+}
+
+/**
+ * Fetch a user profile from Supabase by email
+ */
+export async function fetchSupabaseUser(email: string): Promise<SupabaseUser | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email.trim().toLowerCase())
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching user from Supabase:', error.message);
+      throw error;
+    }
+
+    if (data) {
+      return {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        isKtpVerified: data.is_ktp_verified ?? false,
+        ktpNumber: data.ktp_number,
+        ktpPhoto: data.ktp_photo,
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error('Supabase fetch user failed:', err);
+    return null;
+  }
+}
+
+/**
+ * Register or update a user profile in Supabase
+ */
+export async function upsertSupabaseUser(user: SupabaseUser): Promise<SupabaseUser | null> {
+  if (!supabase) return null;
+  try {
+    const dbData = {
+      id: user.id,
+      name: user.name,
+      email: user.email.trim().toLowerCase(),
+      is_ktp_verified: user.isKtpVerified,
+      ktp_number: user.ktpNumber || null,
+      ktp_photo: user.ktpPhoto || null,
+    };
+
+    const { data, error } = await supabase
+      .from('users')
+      .upsert(dbData, { onConflict: 'email' })
+      .select();
+
+    if (error) {
+      console.error('Error upserting user in Supabase:', error.message);
+      throw error;
+    }
+
+    if (data && data[0]) {
+      return {
+        id: data[0].id,
+        name: data[0].name,
+        email: data[0].email,
+        isKtpVerified: data[0].is_ktp_verified ?? false,
+        ktpNumber: data[0].ktp_number,
+        ktpPhoto: data[0].ktp_photo,
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error('Supabase upsert user failed:', err);
+    return null;
+  }
+}
+

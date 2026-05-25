@@ -49,7 +49,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       register(email, name);
       setMode('ktp');
     } else if (mode === 'ktp') {
-      verifyKtp();
+      verifyKtp(ktpNumber, ktpPhoto || undefined);
       onClose();
     }
   };

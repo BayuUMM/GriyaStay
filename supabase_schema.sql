@@ -2,6 +2,41 @@
 -- Copy and paste this script directly into the Supabase SQL Editor (https://supabase.com)
 -- to instantly provision your table, set up security policies, and seed it with starter data.
 
+-- 0. Create Users Table
+-- This table stores users who log in or register in the application.
+CREATE TABLE IF NOT EXISTS public.users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    is_ktp_verified BOOLEAN DEFAULT FALSE,
+    ktp_number TEXT,
+    ktp_photo TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Turn on Row Level Security (RLS) for Users Table
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS Policies for Users Table
+DROP POLICY IF EXISTS "Allow public read users" ON public.users;
+CREATE POLICY "Allow public read users" 
+ON public.users 
+FOR SELECT 
+USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert users" ON public.users;
+CREATE POLICY "Allow public insert users" 
+ON public.users 
+FOR INSERT 
+WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update users" ON public.users;
+CREATE POLICY "Allow public update users" 
+ON public.users 
+FOR UPDATE 
+USING (true)
+WITH CHECK (true);
+
 -- 1. Create Properties Table
 -- The table schema perfectly matches the `Property` interface in types.ts.
 CREATE TABLE IF NOT EXISTS public.properties (
@@ -29,6 +64,11 @@ CREATE TABLE IF NOT EXISTS public.properties (
 ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
 
 -- 3. Create RLS Policies
+-- Drop existing policies first to allow safe re-running of this script without duplicate name errors
+DROP POLICY IF EXISTS "Allow public read access" ON public.properties;
+DROP POLICY IF EXISTS "Allow authenticated inserts" ON public.properties;
+DROP POLICY IF EXISTS "Allow deletion by owner" ON public.properties;
+
 -- Anyone (authorized or anonymous) can view listed properties.
 CREATE POLICY "Allow public read access" 
 ON public.properties 
