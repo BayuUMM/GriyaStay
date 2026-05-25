@@ -16,6 +16,13 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useUser } from './context/UserContext';
 import { db, isFirebasePlaceholder, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, onSnapshot, getDocs, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { 
+  isSupabaseConfigured, 
+  fetchSupabaseProperties, 
+  upsertSupabaseProperty, 
+  deleteSupabaseProperty,
+  supabase 
+} from './services/supabase';
 
 interface Toast {
   id: string;
@@ -48,39 +55,79 @@ export default function App() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const bannerRef = React.useRef<HTMLDivElement>(null);
 
-  // Sync Properties with Firestore database in Real-time (Skill baseline)
+  // Sync Properties with Database (Supabase or Firestore) in Real-time
   useEffect(() => {
-    if (isFirebasePlaceholder) return;
-
-    const propertiesCollection = collection(db, 'properties');
-
-    const bootstrapFirebase = async () => {
-      try {
-        const querySnapshot = await getDocs(propertiesCollection);
-        if (querySnapshot.empty) {
-          console.log("Empty cloud database, bootstrapping initial mockProperties...");
-          for (const item of mockProperties) {
-            await setDoc(doc(db, 'properties', item.id), item);
+    // 1. Supabase Branch (First Priority for modern Postgres cloud datastores)
+    if (isSupabaseConfigured && supabase) {
+      const loadSupabaseData = async () => {
+        const data = await fetchSupabaseProperties();
+        if (data) {
+          // If Supabase table is completely empty, automatically bootstrap with mock properties for immediate testing
+          if (data.length === 0) {
+            console.log("Empty Supabase table detected. Bootstrapping initial properties...");
+            for (const item of mockProperties) {
+              await upsertSupabaseProperty(item);
+            }
+            const reloaded = await fetchSupabaseProperties();
+            if (reloaded) setProperties(reloaded);
+          } else {
+            setProperties(data);
           }
         }
-      } catch (error) {
-        console.error("Failed to bootstrap listings in Firestore:", error);
-      }
-    };
+      };
 
-    bootstrapFirebase();
+      loadSupabaseData();
 
-    const unsubscribe = onSnapshot(propertiesCollection, (snapshot) => {
-      const plist: Property[] = [];
-      snapshot.forEach((docSnap) => {
-        plist.push({ id: docSnap.id, ...docSnap.data() } as Property);
+      // Setup real-time postgres listeners for any INSERT, UPDATE, or DELETE on 'properties'
+      const channel = supabase
+        .channel('supabase-properties-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'properties' },
+          () => {
+            console.log("Real-time postgres change received, reloading properties...");
+            loadSupabaseData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+
+    // 2. Firebase Branch (Backup / Legacy support)
+    if (!isFirebasePlaceholder) {
+      const propertiesCollection = collection(db, 'properties');
+
+      const bootstrapFirebase = async () => {
+        try {
+          const querySnapshot = await getDocs(propertiesCollection);
+          if (querySnapshot.empty) {
+            console.log("Empty cloud database, bootstrapping initial mockProperties...");
+            for (const item of mockProperties) {
+              await setDoc(doc(db, 'properties', item.id), item);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to bootstrap listings in Firestore:", error);
+        }
+      };
+
+      bootstrapFirebase();
+
+      const unsubscribe = onSnapshot(propertiesCollection, (snapshot) => {
+        const plist: Property[] = [];
+        snapshot.forEach((docSnap) => {
+          plist.push({ id: docSnap.id, ...docSnap.data() } as Property);
+        });
+        setProperties(plist);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'properties');
       });
-      setProperties(plist);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'properties');
-    });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    }
   }, []);
 
   useEffect(() => {
@@ -162,31 +209,50 @@ export default function App() {
   };
 
   const handleAddProperty = async (newProperty: Property) => {
+    const cleanId = newProperty.id || `prop_${Date.now()}`;
+    const cleanDoc: Property = {
+      id: cleanId,
+      title: newProperty.title,
+      description: newProperty.description,
+      price: Number(newProperty.price),
+      location: newProperty.location,
+      type: newProperty.type,
+      image: newProperty.image,
+      rating: Number(newProperty.rating) || 5,
+      reviews: Number(newProperty.reviews) || 1,
+      features: newProperty.features || [],
+      bedrooms: newProperty.bedrooms ? Number(newProperty.bedrooms) : undefined,
+      bathrooms: newProperty.bathrooms ? Number(newProperty.bathrooms) : undefined,
+      sqft: newProperty.sqft ? Number(newProperty.sqft) : undefined,
+      amenities: newProperty.amenities || [],
+      isPromo: !!newProperty.isPromo,
+      createdAt: new Date().toISOString(),
+      ownerId: user?.email || user?.id || undefined,
+      vrImage: newProperty.vrImage || undefined,
+    };
+
+    // 1. Supabase Branch
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const result = await upsertSupabaseProperty(cleanDoc);
+        if (result) {
+          setIsSellModalOpen(false);
+          addToast('Properti Anda berhasil didaftarkan!', 'success');
+        } else {
+          throw new Error("Supabase write returned null");
+        }
+        return;
+      } catch (error) {
+        console.error("Failed to insert into Supabase:", error);
+        addToast('Gagal mendaftarkan properti ke Supabase.', 'info');
+        return;
+      }
+    }
+
+    // 2. Firebase Branch
     if (!isFirebasePlaceholder) {
       try {
-        const cleanId = newProperty.id || `prop_${Date.now()}`;
-        const newDoc: any = {
-          title: newProperty.title,
-          description: newProperty.description,
-          price: Number(newProperty.price),
-          location: newProperty.location,
-          type: newProperty.type,
-          image: newProperty.image,
-          rating: Number(newProperty.rating) || 5,
-          reviews: Number(newProperty.reviews) || 1,
-          features: newProperty.features || [],
-          bedrooms: newProperty.bedrooms ? Number(newProperty.bedrooms) : null,
-          bathrooms: newProperty.bathrooms ? Number(newProperty.bathrooms) : null,
-          sqft: newProperty.sqft ? Number(newProperty.sqft) : null,
-          amenities: newProperty.amenities || [],
-          isPromo: !!newProperty.isPromo,
-          createdAt: new Date().toISOString(),
-          ownerId: user?.email || user?.id || null,
-        };
-        if (newProperty.vrImage) {
-          newDoc.vrImage = newProperty.vrImage;
-        }
-        await setDoc(doc(db, 'properties', cleanId), newDoc);
+        await setDoc(doc(db, 'properties', cleanId), cleanDoc);
         setIsSellModalOpen(false);
         addToast('Properti Anda berhasil didaftarkan!', 'success');
         return;
@@ -196,7 +262,8 @@ export default function App() {
       }
     }
 
-    setProperties(prev => [newProperty, ...prev]);
+    // 3. State Fallback
+    setProperties(prev => [cleanDoc, ...prev]);
     setIsSellModalOpen(false);
     addToast('Properti Anda berhasil didaftarkan!', 'success');
   };
@@ -287,6 +354,27 @@ export default function App() {
   }, [properties, user]);
 
   const handleDeleteProperty = async (id: string) => {
+    // 1. Supabase Branch
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const success = await deleteSupabaseProperty(id);
+        if (success) {
+          addToast(`Properti berhasil dihapus dari database GriyaStay.`, 'info');
+          if (selectedProperty && selectedProperty.id === id) {
+            setSelectedProperty(null);
+          }
+        } else {
+          throw new Error("Supabase delete returned false");
+        }
+        return;
+      } catch (error) {
+        console.error("Failed to delete from Supabase:", error);
+        addToast('Gagal menghapus properti dari Supabase.', 'info');
+        return;
+      }
+    }
+
+    // 2. Firebase Branch
     if (!isFirebasePlaceholder) {
       try {
         await deleteDoc(doc(db, 'properties', id));
@@ -301,6 +389,7 @@ export default function App() {
       }
     }
 
+    // 3. State Fallback
     setProperties(prev => {
       const propertyToDelete = prev.find(p => p.id === id);
       if (propertyToDelete) {
