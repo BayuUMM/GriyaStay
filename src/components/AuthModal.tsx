@@ -6,7 +6,7 @@ import { useUser } from '../context/UserContext';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialMode?: 'login' | 'register';
+  initialMode?: 'login' | 'register' | 'ktp';
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login' }) => {
@@ -23,17 +23,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
 
   useEffect(() => {
     if (isOpen) {
-      if (user) {
-        if (!user.isKtpVerified) {
-          setMode('ktp');
-        } else {
-          onClose();
-        }
-      } else {
-        setMode(initialMode);
-      }
+      setMode(initialMode);
     }
-  }, [isOpen, user, initialMode]);
+  }, [isOpen, initialMode]);
 
   const handlePhotoClick = () => {
     fileInputRef.current?.click();
@@ -58,11 +50,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
       if (mode === 'login') {
         const loggedInUser = await login(email, password, 'User');
         if (loggedInUser) {
-          if (loggedInUser.isKtpVerified) {
-            onClose();
-          } else {
-            setMode('ktp');
-          }
+          onClose();
         } else {
           setError('Gagal masuk. Silakan periksa kembali email Anda.');
         }
@@ -219,11 +207,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'l
                       try {
                         const googleUser = await loginWithGoogle();
                         if (googleUser) {
-                          if (googleUser.isKtpVerified) {
-                            onClose();
-                          } else {
-                            setMode('ktp');
-                          }
+                          onClose();
                         } else {
                           setError('Masuk dengan Google gagal.');
                         }

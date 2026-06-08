@@ -60,7 +60,14 @@ export const ChatAssistant = ({ properties }: ChatAssistantProps) => {
   };
 
   const handleClearChat = () => {
-    if (window.confirm('Apakah Anda ingin menghapus seluruh riwayat percakapan dengan Asisten AI?')) {
+    let confirmClear = false;
+    try {
+      confirmClear = window.confirm('Apakah Anda ingin menghapus seluruh riwayat percakapan dengan Asisten AI?');
+    } catch (e) {
+      // Clean fallback if window.confirm is restricted/blocked in sandboxed environment
+      confirmClear = true;
+    }
+    if (confirmClear) {
       setMessages([
         { role: 'model', text: 'Halo! Saya asisten AI GriyaStay. Saya dapat membantu mencari produk, memberikan rekomendasi villa atau homestay terbaik, memandu Anda mendaftarkan properti untuk dijual, serta menjawab pertanyaan seputar platform kami. Ada yang ingin ditanyakan hari ini?' }
       ]);

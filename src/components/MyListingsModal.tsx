@@ -176,7 +176,9 @@ export default function MyListingsModal({ isOpen, onClose, listings, onDelete }:
                                <ExternalLink size={14} />
                             </button>
                             <button 
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
                                 onDelete(property.id);
                               }}
                               className="p-1.5 bg-red-50 text-red-400 hover:text-red-600 transition-all border border-red-100 hover:border-red-200 rounded-sm"

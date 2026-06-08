@@ -35,6 +35,7 @@ export default function App() {
   const [properties, setProperties] = useState<Property[]>(mockProperties);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [propertyToDelete, setPropertyToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -44,7 +45,7 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
   const [isMyListingsOpen, setIsMyListingsOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'ktp'>('login');
   const [bookingDuration, setBookingDuration] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -62,10 +63,9 @@ export default function App() {
       const loadSupabaseData = async () => {
         const data = await fetchSupabaseProperties();
         if (data) {
-          // If Supabase table is empty or has very few properties (e.g. fewer than 15),
-          // automatically seed with any missing mock properties to guarantee a rich catalog.
-          if (data.length < 15) {
-            console.log("Few records in Supabase, auto-seeding remaining mockProperties...");
+          // If Supabase table is empty, automatically seed with mock properties to guarantee a rich catalog.
+          if (data.length === 0) {
+            console.log("Empty records in Supabase, auto-seeding mockProperties...");
             let updated = false;
             for (const item of mockProperties) {
               const matches = data.some(existing => existing.id === item.id || existing.title.toLowerCase() === item.title.toLowerCase());
@@ -113,9 +113,9 @@ export default function App() {
       const bootstrapFirebase = async () => {
         try {
           const querySnapshot = await getDocs(propertiesCollection);
-          // If Firestore is empty or holds fewer than 15 properties, enrich with missing mock properties
-          if (querySnapshot.size < 15) {
-            console.log("Few records in Cloud Firestore, bootstrapping remaining mockProperties...");
+          // If Firestore is empty, enrich with mock properties
+          if (querySnapshot.size === 0) {
+            console.log("Empty records in Cloud Firestore, bootstrapping mockProperties...");
             const currentIds = querySnapshot.docs.map(docSnap => docSnap.id);
             const currentTitles = querySnapshot.docs.map(docSnap => (docSnap.data() as any).title?.toLowerCase());
             for (const item of mockProperties) {
@@ -213,7 +213,7 @@ export default function App() {
     return counts;
   }, [properties, selectedLocation, user]);
 
-  const openAuth = (mode: 'login' | 'register') => {
+  const openAuth = (mode: 'login' | 'register' | 'ktp') => {
     setAuthMode(mode);
     setIsAuthModalOpen(true);
   };
@@ -260,14 +260,12 @@ export default function App() {
           });
           setIsSellModalOpen(false);
           addToast('Properti Anda berhasil didaftarkan!', 'success');
+          return;
         } else {
-          throw new Error("Supabase write returned null");
+          console.warn("Supabase write returned null. Falling back to next database branch.");
         }
-        return;
       } catch (error) {
-        console.error("Failed to insert into Supabase:", error);
-        addToast('Gagal mendaftarkan properti ke Supabase.', 'info');
-        return;
+        console.error("Failed to insert into Supabase, trying fallback:", error);
       }
     }
 
@@ -375,53 +373,56 @@ export default function App() {
     return owned;
   }, [properties, user]);
 
-  const handleDeleteProperty = async (id: string) => {
-    // 1. Supabase Branch
+  const handleDeleteProperty = (id: string) => {
+    // Open our beautiful, iframe-safe custom confirmation modal
+    setPropertyToDelete(id);
+  };
+
+  const executeDeleteProperty = async (id: string) => {
+    // Cari properti lokal terlebih dahulu untuk mendapatkan judulnya sebelum dihapus
+    const targetProperty = properties.find(p => p.id === id);
+    const title = targetProperty ? targetProperty.title : "Properti";
+
+    let deletedStateDirectly = false;
+
+    // 1. Cabang Supabase
     if (isSupabaseConfigured && supabase) {
       try {
         const success = await deleteSupabaseProperty(id);
         if (success) {
           setProperties(prev => prev.filter(p => p.id !== id));
-          addToast(`Properti berhasil dihapus dari database GriyaStay.`, 'info');
-          if (selectedProperty && selectedProperty.id === id) {
-            setSelectedProperty(null);
-          }
+          deletedStateDirectly = true;
         } else {
-          throw new Error("Supabase delete returned false");
+          console.warn("Supabase delete returned false. Falling back to next database branch.");
         }
-        return;
       } catch (error) {
-        console.error("Failed to delete from Supabase:", error);
-        addToast('Gagal menghapus properti dari Supabase.', 'info');
-        return;
+        console.error("Failed to delete from Supabase, trying fallback:", error);
       }
     }
 
-    // 2. Firebase Branch
-    if (!isFirebasePlaceholder) {
-      try {
-        await deleteDoc(doc(db, 'properties', id));
-        addToast(`Properti berhasil dihapus dari database GriyaStay.`, 'info');
-        if (selectedProperty && selectedProperty.id === id) {
-          setSelectedProperty(null);
+    if (!deletedStateDirectly) {
+      // 2. Cabang Firebase (Firestore)
+      if (!isFirebasePlaceholder) {
+        try {
+          await deleteDoc(doc(db, 'properties', id));
+          // Listener onSnapshot di App.tsx akan memperbarui data secara real-time dari Firestore,
+          // sehingga kita tidak perlu memaksa pembaruan state lokal secara manual di sini.
+          deletedStateDirectly = true;
+        } catch (error) {
+          console.error("Firestore delete failed. Falling back to state:", error);
         }
-        return;
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `properties/${id}`);
-        return;
       }
     }
 
-    // 3. State Fallback
-    setProperties(prev => {
-      const propertyToDelete = prev.find(p => p.id === id);
-      if (propertyToDelete) {
-        addToast(`"${propertyToDelete.title}" berhasil dihapus dari GriyaStay.`, 'info');
-      }
-      return prev.filter(p => p.id !== id);
-    });
-    
-    // Safety check for detail modal
+    // 3. Cadangan Pembaruan State Lokal (jika database tidak dikonfigurasi)
+    if (!deletedStateDirectly) {
+      setProperties(prev => prev.filter(p => p.id !== id));
+    }
+
+    // Tampilkan notifikasi toast tepat 1x di luar fungsi updater state React
+    addToast(`"${title}" berhasil dihapus dari GriyaStay.`, 'info');
+
+    // Kosongkan pilihan jika properti yang dihapus sedang dibuka di modal detail
     if (selectedProperty && selectedProperty.id === id) {
       setSelectedProperty(null);
     }
@@ -763,7 +764,7 @@ export default function App() {
                     onClick={handlePropertyClick}
                     onOpenVR={(p) => setVrProperty(p)}
                     onShare={(p) => addToast(`Link "${p.title}" berhasil disalin!`, 'info')}
-                    isOwner={user && property.ownerId === user.email}
+                    isOwner={user && (property.ownerId === user.email || property.ownerId === user.id)}
                     onDelete={(id, e) => {
                       handleDeleteProperty(id);
                     }}
@@ -882,7 +883,7 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {user && selectedProperty.ownerId === user.email && (
+                    {user && (selectedProperty.ownerId === user.email || selectedProperty.ownerId === user.id) && (
                       <button 
                         onClick={() => {
                           handleDeleteProperty(selectedProperty.id);
@@ -1320,6 +1321,52 @@ export default function App() {
         isOpen={!!vrProperty}
         onClose={() => setVrProperty(null)}
       />
+
+      {/* Beautiful, iframe-safe custom Delete Confirmation Modal */}
+      <AnimatePresence>
+        {propertyToDelete && (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPropertyToDelete(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="relative bg-white w-full max-w-sm rounded-sm shadow-2xl p-6 border border-slate-100 text-center z-10"
+            >
+              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-2">Konfirmasi Hapus</h3>
+              <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                Apakah Anda yakin ingin menghapus properti ini dari daftar penjualan Anda? Tindakan ini tidak dapat dibatalkan.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button 
+                  onClick={() => setPropertyToDelete(null)}
+                  className="flex-1 py-2 px-4 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-sm text-xs font-bold transition-all uppercase tracking-wider"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={() => {
+                    executeDeleteProperty(propertyToDelete);
+                    setPropertyToDelete(null);
+                  }}
+                  className="flex-1 py-2 px-4 bg-red-600 text-white hover:bg-red-700 hover:shadow-lg rounded-sm text-xs font-bold transition-all uppercase tracking-wider"
+                >
+                  Hapus
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -156,20 +156,20 @@ export default function PropertyCard({
               )}
             </AnimatePresence>
           </div>
-        </div>
 
-        {isOwner && onDelete && (
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(property.id, e);
-            }}
-            className="absolute top-1/2 -translate-y-1/2 right-3 p-2 bg-white/80 text-slate-400 hover:bg-red-500 hover:text-white rounded-full transition-all shadow-md backdrop-blur-md"
-            title="Hapus Iklan"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
+          {isOwner && onDelete && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(property.id, e);
+              }}
+              className="p-2 bg-white/80 hover:bg-red-500 text-slate-400 hover:text-white rounded-full transition-all shadow-md backdrop-blur-md flex items-center justify-center"
+              title="Hapus Iklan"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
 
         <div className="absolute bottom-3 left-3 right-3">
           <div className="flex items-center gap-1.5 text-white/90 text-[10px] font-bold">

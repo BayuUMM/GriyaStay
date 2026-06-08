@@ -29,7 +29,7 @@ interface NavbarProps {
   onSearch: (query: string) => void;
   favoriteCount: number;
   cartCount: number;
-  onOpenAuth: (mode: 'login' | 'register') => void;
+  onOpenAuth: (mode: 'login' | 'register' | 'ktp') => void;
   onOpenCart: () => void;
   onShowMyListings: () => void;
 }
@@ -75,7 +75,7 @@ export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth,
                   </div>
                   {!user.isKtpVerified && (
                     <button 
-                      onClick={() => onOpenAuth('register')}
+                      onClick={() => onOpenAuth('ktp')}
                       className="w-full text-left px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-[11px] flex items-center gap-2 transition-colors text-amber-400"
                     >
                       <ShieldCheck size={14} /> Verifikasi KTP
@@ -163,7 +163,7 @@ export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth,
                              <button 
                               className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-sm transition-colors text-amber-400"
                               onClick={() => {
-                                onOpenAuth('register');
+                                onOpenAuth('ktp');
                                 setIsMobileMenuOpen(false);
                               }}
                             >
@@ -294,7 +294,7 @@ export default function Navbar({ onSearch, favoriteCount, cartCount, onOpenAuth,
                         {!user.isKtpVerified && (
                           <button 
                             className="flex items-center gap-3 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-[11px] transition-colors text-amber-400"
-                            onClick={() => onOpenAuth('register')}
+                            onClick={() => onOpenAuth('ktp')}
                           >
                             <ShieldCheck size={14} /> Verifikasi KTP
                           </button>
